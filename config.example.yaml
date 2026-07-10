@@ -1,0 +1,26 @@
+# Copy this to config.yaml and edit.  The app reads ./config.yaml (or $CALBOARD_CONFIG).
+
+# Start in demo mode with sample events — no calendar URLs needed. Flip to false
+# once you've filled in your real calendars below.
+demo: true
+
+timezone: America/Los_Angeles
+
+# Your calendars. Each needs a private iCal (.ics) URL — no login/OAuth required:
+#   Google Calendar → Settings → <calendar> → "Secret address in iCal format"
+#   iCloud → share a calendar → make it Public → copy link → change webcal:// to https://
+# The color is how that calendar's events show up (like Skylight's per-person colors).
+calendars:
+  - name: Personal
+    color: "#4c8dff"
+    ics: "https://example.com/replace-with-your-google-ical.ics"
+  - name: Family
+    color: "#22c55e"
+    ics: "https://example.com/replace-with-your-icloud-ical.ics"
+
+whats_next_count: 6     # how many upcoming events the "What's Next" panel features
+agenda_days: 14         # how many days ahead to pull
+
+web:
+  host: 0.0.0.0         # 0.0.0.0 = reachable from your phone on the same network
+  port: 8000

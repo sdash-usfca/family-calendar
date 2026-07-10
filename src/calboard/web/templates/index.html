@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Family Calendar</title>
+  <style>
+    :root {
+      --bg: #eef1f8; --card: #ffffff; --ink: #1e2430; --muted: #8a92a6;
+      --line: #e6e9f2; --accent: #4c8dff; --warn: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+
+    header { display: flex; align-items: flex-end; justify-content: space-between;
+      padding: 22px 30px 14px; }
+    .today { font-size: 30px; font-weight: 800; letter-spacing: .3px; }
+    .today .dow { color: var(--accent); }
+    .clock { font-size: 52px; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+
+    main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; padding: 0 30px 24px;
+      height: calc(100vh - 96px); }
+    .panel { background: var(--card); border-radius: 22px; padding: 20px 22px; overflow: hidden;
+      box-shadow: 0 8px 30px rgba(30,40,80,.06); display: flex; flex-direction: column; }
+    .panel h2 { margin: 0 0 12px; font-size: 18px; letter-spacing: .3px; }
+    .panel .scroll { overflow-y: auto; }
+    .panel .scroll::-webkit-scrollbar { width: 0; }
+
+    /* What's Next — the hero */
+    .next .item { display: flex; gap: 14px; align-items: stretch; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .next .item:last-child { border-bottom: 0; }
+    .next .bar { width: 6px; border-radius: 6px; flex: none; }
+    .next .body { flex: 1; min-width: 0; }
+    .next .title { font-size: 21px; font-weight: 700; line-height: 1.15; }
+    .next .meta { color: var(--muted); font-size: 14px; margin-top: 3px; }
+    .next .when { font-size: 15px; font-weight: 700; margin-top: 4px; }
+    .next .chip { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 800;
+      padding: 2px 9px; border-radius: 999px; background: #eef2ff; color: var(--accent); vertical-align: middle; }
+    .next .chip.soon { background: #fee2e2; color: var(--warn); }
+
+    /* This week — agenda grouped by day */
+    .day { margin-bottom: 14px; }
+    .day .dhead { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin: 4px 0 8px; }
+    .day .dhead.is-today { color: var(--accent); }
+    .ev { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px;
+      background: #f7f9ff; margin-bottom: 7px; }
+    .ev .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+    .ev .t { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ev .time { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .empty { color: var(--muted); padding: 20px 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="today"><span class="dow" id="dow">—</span> <span id="date"></span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>📅 This Week</h2>
+      <div class="scroll" id="agenda"><div class="empty">Loading…</div></div>
+    </section>
+    <section class="panel next">
+      <h2>⏰ What's Next</h2>
+      <div class="scroll" id="next"><div class="empty">Loading…</div></div>
+    </section>
+  </main>
+
+  <script>
+    let TZ = undefined;   // set from the API (the Pi's timezone)
+
+    function tick() {
+      const now = new Date();
+      document.getElementById('clock').textContent =
+        now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('dow').textContent =
+        now.toLocaleDateString([], { weekday: 'long' });
+      document.getElementById('date').textContent =
+        now.toLocaleDateString([], { month: 'long', day: 'numeric' });
+    }
+
+    function sameDay(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+    function timeStr(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+
+    // "Today · 2:00 PM", "Tomorrow · 2:00 PM", "Thu · 2:00 PM", "Jul 20 · 2:00 PM"
+    function whenStr(start, allDay, now) {
+      const tmr = new Date(now); tmr.setDate(now.getDate() + 1);
+      let day;
+      if (sameDay(start, now)) day = 'Today';
+      else if (sameDay(start, tmr)) day = 'Tomorrow';
+      else if ((start - now) < 7 * 864e5) day = start.toLocaleDateString([], { weekday: 'short' });
+      else day = start.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return allDay ? day : `${day} · ${timeStr(start)}`;
+    }
+
+    // relative countdown chip: "in 2h", "in 3 days", "Now"
+    function countdown(start, end, now) {
+      if (start <= now && end > now) return { text: 'Now', soon: true };
+      const mins = Math.round((start - now) / 60000);
+      if (mins < 0) return null;
+      if (mins < 60) return { text: `in ${mins}m`, soon: mins <= 60 };
+      const hrs = Math.round(mins / 60);
+      if (hrs < 24) return { text: `in ${hrs}h`, soon: hrs <= 2 };
+      const days = Math.round(hrs / 24);
+      return { text: `in ${days} day${days > 1 ? 's' : ''}`, soon: false };
+    }
+
+    async function refresh() {
+      let data;
+      try { data = await (await fetch('/api/agenda')).json(); }
+      catch (e) { return; }
+      TZ = data.timezone;
+      const now = new Date(data.now);
+      const events = data.events.map(e => ({
+        ...e, s: new Date(e.start), e2: new Date(e.end),
+      }));
+
+      // ---- What's Next ----
+      const nextEl = document.getElementById('next');
+      const upcoming = events.filter(e => e.e2 >= now).slice(0, data.whats_next_count);
+      nextEl.innerHTML = upcoming.length ? upcoming.map(e => {
+        const cd = countdown(e.s, e.e2, now);
+        const chip = cd ? `<span class="chip ${cd.soon ? 'soon' : ''}">${cd.text}</span>` : '';
+        const loc = e.location ? ` · ${e.location}` : '';
+        return `<div class="item">
+          <div class="bar" style="background:${e.color}"></div>
+          <div class="body">
+            <div class="title">${e.title}</div>
+            <div class="meta">${e.calendar}${loc}</div>
+            <div class="when">${whenStr(e.s, e.all_day, now)}${chip}</div>
+          </div></div>`;
+      }).join('') : '<div class="empty">Nothing coming up 🎉</div>';
+
+      // ---- This Week (grouped by day) ----
+      const agendaEl = document.getElementById('agenda');
+      const byDay = {};
+      events.filter(e => e.e2 >= now).forEach(e => {
+        const k = e.s.toDateString();
+        (byDay[k] = byDay[k] || []).push(e);
+      });
+      const keys = Object.keys(byDay).sort((a, b) => new Date(a) - new Date(b));
+      agendaEl.innerHTML = keys.length ? keys.map(k => {
+        const d = new Date(k);
+        const isToday = sameDay(d, now);
+        const head = isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+        const rows = byDay[k].map(e => `<div class="ev">
+            <div class="dot" style="background:${e.color}"></div>
+            <div class="t">${e.title}</div>
+            <div class="time">${e.all_day ? 'all day' : timeStr(e.s)}</div>
+          </div>`).join('');
+        return `<div class="day"><div class="dhead ${isToday ? 'is-today' : ''}">${head}</div>${rows}</div>`;
+      }).join('') : '<div class="empty">No events in the next couple of weeks.</div>';
+    }
+
+    tick(); setInterval(tick, 1000);
+    refresh(); setInterval(refresh, 60000);   // re-pull calendars every minute
+    setInterval(refresh, 30000);              // (countdowns refresh with it)
+  </script>
+</body>
+</html>

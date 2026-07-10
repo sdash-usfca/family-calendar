@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: calboard
+Version: 0.1.0
+Summary: A colorful wall calendar / family command center for a Raspberry Pi + monitor (Skylight-style).
+Requires-Python: >=3.9
+Requires-Dist: flask>=2.2
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: requests>=2.28
+Requires-Dist: icalendar>=5.0
+Requires-Dist: recurring-ical-events>=2.1
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
