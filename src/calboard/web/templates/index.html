@@ -6,89 +6,246 @@
   <title>Family Calendar</title>
   <style>
     :root {
-      --bg: #eef1f8; --card: #ffffff; --ink: #1e2430; --muted: #8a92a6;
-      --line: #e6e9f2; --accent: #4c8dff; --warn: #ef4444;
+      --bg: #f7f2e9; --card: #ffffff; --ink: #2a2620; --muted: #93897a;
+      --line: #ece4d4; --accent: #d1603f; --today-line: #e2523f;
+      --chip-bg: #fdeee2; --chip-ink: #b45830; --chip-soon-bg: #fde3e0; --chip-soon-ink: #c23a2c;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-    body { margin: 0; background: var(--bg); color: var(--ink);
-      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    body { margin: 0; background: var(--bg); color: var(--ink); overflow: hidden;
+      display: flex; flex-direction: column;
+      font-family: -apple-system, "Segoe UI", system-ui, Roboto, sans-serif; }
+    .serif { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
 
-    header { display: flex; align-items: flex-end; justify-content: space-between;
-      padding: 22px 30px 14px; }
-    .today { font-size: 30px; font-weight: 800; letter-spacing: .3px; }
-    .today .dow { color: var(--accent); }
-    .clock { font-size: 52px; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+    header { display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 24px 32px 10px; gap: 20px; flex: none; }
+    .greeting { color: var(--muted); font-size: 15px; margin-bottom: 2px; }
+    .today-date { font-size: 34px; font-weight: 700; line-height: 1.1; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+    .legend .who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+    .legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 
-    main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; padding: 0 30px 24px;
-      height: calc(100vh - 96px); }
-    .panel { background: var(--card); border-radius: 22px; padding: 20px 22px; overflow: hidden;
-      box-shadow: 0 8px 30px rgba(30,40,80,.06); display: flex; flex-direction: column; }
-    .panel h2 { margin: 0 0 12px; font-size: 18px; letter-spacing: .3px; }
-    .panel .scroll { overflow-y: auto; }
-    .panel .scroll::-webkit-scrollbar { width: 0; }
+    .hub-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+    .nextup { display: inline-flex; align-items: center; gap: 8px; background: var(--card);
+      border-radius: 12px; padding: 6px 13px; box-shadow: 0 4px 16px rgba(60,45,25,.06); font-size: 14px; }
+    .nextup .lbl { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+    .nextup .ndot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+    .nextup .nt { font-weight: 700; }
+    .nextup .ncd { color: var(--muted); }
+    .binbadge { display: inline-flex; align-items: center; gap: 6px; background: #e3f3ea; color: #2c7a4b;
+      border-radius: 12px; padding: 6px 13px; font-size: 14px; font-weight: 700; }
 
-    /* What's Next — the hero */
-    .next .item { display: flex; gap: 14px; align-items: stretch; padding: 14px 0; border-bottom: 1px solid var(--line); }
-    .next .item:last-child { border-bottom: 0; }
-    .next .bar { width: 6px; border-radius: 6px; flex: none; }
-    .next .body { flex: 1; min-width: 0; }
-    .next .title { font-size: 21px; font-weight: 700; line-height: 1.15; }
-    .next .meta { color: var(--muted); font-size: 14px; margin-top: 3px; }
-    .next .when { font-size: 15px; font-weight: 700; margin-top: 4px; }
-    .next .chip { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 800;
-      padding: 2px 9px; border-radius: 999px; background: #eef2ff; color: var(--accent); vertical-align: middle; }
-    .next .chip.soon { background: #fee2e2; color: var(--warn); }
+    .hdr-right { display: flex; align-items: center; gap: 18px; flex: none; }
+    .weather { display: flex; align-items: center; gap: 8px; background: var(--card);
+      border-radius: 16px; padding: 8px 16px; box-shadow: 0 4px 16px rgba(60,45,25,.06); }
+    .weather .icon { font-size: 26px; }
+    .weather .temp { font-size: 20px; font-weight: 700; }
+    .weather .range { color: var(--muted); font-size: 12px; }
+    .clock { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .clock .ampm { font-size: 20px; color: var(--muted); margin-left: 2px; }
 
-    /* This week — agenda grouped by day */
-    .day { margin-bottom: 14px; }
-    .day .dhead { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-      color: var(--muted); margin: 4px 0 8px; }
-    .day .dhead.is-today { color: var(--accent); }
-    .ev { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px;
-      background: #f7f9ff; margin-bottom: 7px; }
-    .ev .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
-    .ev .t { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ev .time { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .empty { color: var(--muted); padding: 20px 4px; }
+    main { display: grid; grid-template-columns: 1fr 380px; gap: 20px; padding: 6px 32px 24px;
+      flex: 1 1 auto; min-height: 0; }
+
+    /* Day-column week board */
+    .board { display: flex; gap: 14px; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+    .board::-webkit-scrollbar { height: 0; }
+    .daycol { background: var(--card); border-radius: 18px; padding: 14px; flex: 1 0 200px;
+      min-width: 200px; display: flex; flex-direction: column; box-shadow: 0 4px 16px rgba(60,45,25,.05);
+      border: 2px solid transparent; overflow: hidden; }
+    .daycol.is-today { border-color: var(--today-line); }
+    .daycol .dname { font-weight: 700; font-size: 15px; }
+    .daycol.is-today .dname { color: var(--today-line); }
+    .daycol .ddate { color: var(--muted); font-size: 12px; float: right; margin-top: 2px; }
+    .daycol .devents { overflow-y: auto; margin-top: 10px; padding-right: 2px; }
+    .daycol .devents::-webkit-scrollbar { width: 0; }
+    .devt { border-radius: 10px; background: var(--bg); padding: 8px 10px;
+      margin-bottom: 8px; }
+    .devt .time { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+    .devt .title { font-size: 13px; font-weight: 600; line-height: 1.25; margin-top: 1px; }
+    .devt .loc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .daycol .empty { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+    /* Right column: Up Next, Chores/Dinner, Word of the Day */
+    .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow: hidden; }
+    .panel { background: var(--card); border-radius: 18px; padding: 18px 20px;
+      box-shadow: 0 4px 16px rgba(60,45,25,.06); }
+    /* right column: grocery / checklist / dinner share the height evenly */
+    .side > .panel { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .side > .panel > h2 { flex: none; }
+    #checklist, #meal, #notes { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    #checklist::-webkit-scrollbar, #meal::-webkit-scrollbar, #notes::-webkit-scrollbar { width: 0; }
+    .note-item { display: flex; gap: 8px; padding: 9px 2px; border-bottom: 1px solid var(--line);
+      font-size: 15px; line-height: 1.35; }
+    .note-item .nmark { flex: none; }
+    .panel h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+    .panel h2 .ic { display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 10px; background: #f3ece0; font-size: 17px; flex: none; }
+    .ic.groc { background: #e3f3ea; } .ic.check { background: #e9e4f7; }
+    .ic.meal { background: #fdeadd; } .ic.word { background: #fde1de; } .ic.notes { background: #fdeede; }
+
+    .next { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .next .scroll { overflow-y: auto; }
+    .next .scroll::-webkit-scrollbar { width: 0; }
+    .nitem { border-radius: 12px; background: var(--bg);
+      padding: 10px 12px; margin-bottom: 9px; display: flex; align-items: center; gap: 8px; }
+    .nitem .body { flex: 1; min-width: 0; }
+    .nitem .title { font-weight: 700; font-size: 15px; line-height: 1.2; }
+    .nitem .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .nitem .chip { flex: none; text-align: right; font-size: 12px; font-weight: 700;
+      background: var(--chip-bg); color: var(--chip-ink); padding: 3px 9px; border-radius: 999px;
+      white-space: nowrap; }
+    .nitem .chip.soon { background: var(--chip-soon-bg); color: var(--chip-soon-ink); }
+
+    /* Grocery list */
+    .grocery { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .grocery .scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+    .grocery .scroll::-webkit-scrollbar { width: 0; }
+    .gitem { display: flex; align-items: center; gap: 11px; padding: 9px 2px;
+      border-bottom: 1px solid var(--line); cursor: pointer; }
+    .gitem .box { width: 21px; height: 21px; border-radius: 6px; border: 2px solid var(--line);
+      flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+    .gitem.done .box { background: var(--accent); border-color: var(--accent); }
+    .gitem .gtext { font-size: 15px; font-weight: 600; }
+    .gitem.done .gtext { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+    .panel h2 .hdr-qr { margin-left: auto; flex: none; line-height: 0; }
+    .panel h2 .hdr-qr img { width: 48px; height: 48px; border-radius: 8px; background: #fff; padding: 2px; display: block; }
+
+    .chore { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+    .chore .box { width: 15px; height: 15px; border-radius: 5px; border: 2px solid var(--line);
+      flex: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .chore .box.done { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 10px; }
+    .chore .who { color: var(--muted); }
+    .chore.done .task { text-decoration: line-through; color: var(--muted); }
+    .empty-hint { color: var(--muted); font-size: 12px; }
+
+    /* Dinner / recipe card */
+    .meal-name { font-size: 16px; font-weight: 700; }
+    .recipe { display: flex; gap: 12px; }
+    .recipe img.thumb { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; flex: none; }
+    .recipe .rbody { flex: 1; min-width: 0; }
+    .recipe .tags { margin-top: 3px; }
+    .recipe .tag { display: inline-block; background: var(--chip-bg); color: var(--chip-ink);
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 5px; }
+    .recipe .ingredients { color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.4; }
+    .recipe .qr { flex: none; text-align: center; }
+    .recipe .qr img { width: 56px; height: 56px; border-radius: 8px; }
+    .recipe .qr .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .word .whead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .word .w { font-size: 22px; font-weight: 700; }
+    .word .phon { color: var(--muted); font-size: 13px; }
+    .word .pos { display: inline-block; background: var(--chip-bg); color: var(--chip-ink);
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+    .word .def { font-size: 13px; margin-top: 8px; line-height: 1.4; }
+    .word .ex-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--muted); margin-top: 10px; }
+    .word .ex { font-size: 13px; font-style: italic; margin-top: 3px; line-height: 1.4;
+      border-left: 3px solid var(--line); padding-left: 8px; }
   </style>
 </head>
 <body>
   <header>
-    <div class="today"><span class="dow" id="dow">—</span> <span id="date"></span></div>
-    <div class="clock" id="clock">--:--</div>
+    <div>
+      <div class="greeting" id="greeting">Good day</div>
+      <div class="today-date serif" id="today-date">—</div>
+      <div class="legend" id="legend"></div>
+      <div class="hub-strip">
+        <div class="nextup" id="nextup" style="display:none"></div>
+        <div class="binbadge" id="binbadge" style="display:none"></div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div class="weather" id="weather" style="display:none">
+        <span class="icon" id="w-icon">🌤️</span>
+        <div><div class="temp" id="w-temp">--°</div><div class="range" id="w-range">H --° · L --°</div></div>
+      </div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
   </header>
 
   <main>
-    <section class="panel">
-      <h2>📅 This Week</h2>
-      <div class="scroll" id="agenda"><div class="empty">Loading…</div></div>
-    </section>
-    <section class="panel next">
-      <h2>⏰ What's Next</h2>
-      <div class="scroll" id="next"><div class="empty">Loading…</div></div>
-    </section>
+    <div class="board" id="board"></div>
+
+    <div class="side">
+      <section class="panel grocery">
+        <h2><span class="ic groc">🛒</span>Grocery List<span class="hdr-qr" id="grocery-qr" title="Scan to open the list on your phone"></span></h2>
+        <div class="scroll" id="grocery"><div class="empty-hint">Loading…</div></div>
+      </section>
+
+      <section class="panel" id="notes-panel">
+        <h2><span class="ic notes">💌</span>Family Notes</h2>
+        <div id="notes"><div class="empty-hint">Loading…</div></div>
+      </section>
+
+      <section class="panel" id="checklist-panel">
+        <h2><span class="ic check">📋</span>Today's Checklist</h2>
+        <div id="checklist"><div class="empty-hint">Loading…</div></div>
+      </section>
+
+      <section class="panel" id="meal-panel">
+        <h2><span class="ic meal">🍽️</span>Dinner Tonight<span class="hdr-qr" id="meal-qr" title="Scan for the recipe"></span></h2>
+        <div id="meal"><div class="empty-hint">Loading…</div></div>
+      </section>
+
+      <section class="panel word" id="word-panel" style="display:none">
+        <h2><span class="ic word">📖</span>Word of the Day</h2>
+        <div class="whead">
+          <span class="w" id="wd-word"></span>
+          <span class="phon" id="wd-phon"></span>
+          <span class="pos" id="wd-pos"></span>
+        </div>
+        <div class="def" id="wd-def"></div>
+        <div class="ex-label" id="wd-ex-label" style="display:none">Use it in a sentence</div>
+        <div class="ex" id="wd-ex" style="display:none"></div>
+      </section>
+    </div>
   </main>
 
   <script>
-    let TZ = undefined;   // set from the API (the Pi's timezone)
-
-    function tick() {
-      const now = new Date();
-      document.getElementById('clock').textContent =
-        now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      document.getElementById('dow').textContent =
-        now.toLocaleDateString([], { weekday: 'long' });
-      document.getElementById('date').textContent =
-        now.toLocaleDateString([], { month: 'long', day: 'numeric' });
-    }
-
     function sameDay(a, b) {
       return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
     }
     function timeStr(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 
-    // "Today · 2:00 PM", "Tomorrow · 2:00 PM", "Thu · 2:00 PM", "Jul 20 · 2:00 PM"
+    // Color helpers for pastel event tiles
+    function hexToRgb(hex) {
+      hex = String(hex || '#888888').replace('#', '');
+      if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+      const n = parseInt(hex, 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function mix(hex, target, t) {
+      const [r, g, b] = hexToRgb(hex);
+      const R = Math.round(r + (target[0] - r) * t);
+      const G = Math.round(g + (target[1] - g) * t);
+      const B = Math.round(b + (target[2] - b) * t);
+      return `rgb(${R}, ${G}, ${B})`;
+    }
+    const pastel = hex => mix(hex, [255, 255, 255], 0.80);  // soft tinted fill for whole tile
+    const deep   = hex => mix(hex, [38, 30, 24], 0.30);     // readable colored text on the pastel
+
+    function tick() {
+      const now = new Date();
+      const h = now.getHours();
+      document.getElementById('greeting').textContent =
+        h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      document.getElementById('today-date').textContent =
+        now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+      const parts = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).split(' ');
+      document.getElementById('clock').innerHTML = parts[0] + (parts[1] ? `<span class="ampm">${parts[1]}</span>` : '');
+    }
+
+    function countdown(start, end, now) {
+      if (start <= now && end > now) return { text: 'Now', soon: true };
+      const mins = Math.round((start - now) / 60000);
+      if (mins < 0) return null;
+      if (mins < 60) return { text: `in ${mins}m`, soon: true };
+      const hrs = Math.round(mins / 60);
+      if (hrs < 24) return { text: `in ${hrs}h`, soon: hrs <= 2 };
+      const days = Math.round(hrs / 24);
+      return { text: `in ${days} day${days > 1 ? 's' : ''}`, soon: false };
+    }
     function whenStr(start, allDay, now) {
       const tmr = new Date(now); tmr.setDate(now.getDate() + 1);
       let day;
@@ -99,68 +256,201 @@
       return allDay ? day : `${day} · ${timeStr(start)}`;
     }
 
-    // relative countdown chip: "in 2h", "in 3 days", "Now"
-    function countdown(start, end, now) {
-      if (start <= now && end > now) return { text: 'Now', soon: true };
-      const mins = Math.round((start - now) / 60000);
-      if (mins < 0) return null;
-      if (mins < 60) return { text: `in ${mins}m`, soon: mins <= 60 };
-      const hrs = Math.round(mins / 60);
-      if (hrs < 24) return { text: `in ${hrs}h`, soon: hrs <= 2 };
-      const days = Math.round(hrs / 24);
-      return { text: `in ${days} day${days > 1 ? 's' : ''}`, soon: false };
-    }
-
-    async function refresh() {
+    async function refreshAgenda() {
       let data;
       try { data = await (await fetch('/api/agenda')).json(); }
       catch (e) { return; }
-      TZ = data.timezone;
       const now = new Date(data.now);
-      const events = data.events.map(e => ({
-        ...e, s: new Date(e.start), e2: new Date(e.end),
-      }));
+      const events = data.events.map(e => ({ ...e, s: new Date(e.start), e2: new Date(e.end) }));
 
-      // ---- What's Next ----
-      const nextEl = document.getElementById('next');
-      const upcoming = events.filter(e => e.e2 >= now).slice(0, data.whats_next_count);
-      nextEl.innerHTML = upcoming.length ? upcoming.map(e => {
-        const cd = countdown(e.s, e.e2, now);
-        const chip = cd ? `<span class="chip ${cd.soon ? 'soon' : ''}">${cd.text}</span>` : '';
-        const loc = e.location ? ` · ${e.location}` : '';
-        return `<div class="item">
-          <div class="bar" style="background:${e.color}"></div>
-          <div class="body">
-            <div class="title">${e.title}</div>
-            <div class="meta">${e.calendar}${loc}</div>
-            <div class="when">${whenStr(e.s, e.all_day, now)}${chip}</div>
-          </div></div>`;
-      }).join('') : '<div class="empty">Nothing coming up 🎉</div>';
+      // ---- Legend ----
+      document.getElementById('legend').innerHTML = data.legend.map(l =>
+        `<span class="who"><span class="dot" style="background:${l.color}"></span>${l.name}</span>`).join('');
 
-      // ---- This Week (grouped by day) ----
-      const agendaEl = document.getElementById('agenda');
-      const byDay = {};
-      events.filter(e => e.e2 >= now).forEach(e => {
-        const k = e.s.toDateString();
-        (byDay[k] = byDay[k] || []).push(e);
-      });
-      const keys = Object.keys(byDay).sort((a, b) => new Date(a) - new Date(b));
-      agendaEl.innerHTML = keys.length ? keys.map(k => {
-        const d = new Date(k);
+      // ---- Next up + bin reminder (in the header strip) ----
+      const upcoming = events.filter(e => e.e2 >= now).sort((a, b) => a.s - b.s);
+      const nx = upcoming[0];
+      const nextEl = document.getElementById('nextup');
+      if (nx) {
+        const cd = countdown(nx.s, nx.e2, now);
+        nextEl.style.display = '';
+        nextEl.innerHTML = `<span class="lbl">Next up</span>` +
+          `<span class="ndot" style="background:${nx.color}"></span>` +
+          `<span class="nt">${escapeHtml(nx.title)}</span>` +
+          `<span class="ncd">· ${whenStr(nx.s, nx.all_day, now)}${cd ? ' · ' + cd.text : ''}</span>`;
+      } else { nextEl.style.display = 'none'; }
+
+      const binRe = /recycl|trash|garbage|compost|\bbin\b/i;
+      const binSoon = new Date(now.getTime() + 2 * 864e5);
+      const binEv = events.filter(e => binRe.test(e.title) && e.e2 >= now && e.s <= binSoon)
+                          .sort((a, b) => a.s - b.s)[0];
+      const binEl = document.getElementById('binbadge');
+      if (binEv) {
+        binEl.style.display = '';
+        binEl.textContent = `♻️ ${binEv.title} — ${whenStr(binEv.s, binEv.all_day, now)}`;
+      } else { binEl.style.display = 'none'; }
+
+      // ---- Day-column board ----
+      const boardEl = document.getElementById('board');
+      const cols = [];
+      for (let i = 0; i < data.board_days; i++) {
+        const d = new Date(now); d.setDate(now.getDate() + i); d.setHours(0, 0, 0, 0);
+        cols.push(d);
+      }
+      boardEl.innerHTML = cols.map(d => {
         const isToday = sameDay(d, now);
-        const head = isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
-        const rows = byDay[k].map(e => `<div class="ev">
-            <div class="dot" style="background:${e.color}"></div>
-            <div class="t">${e.title}</div>
-            <div class="time">${e.all_day ? 'all day' : timeStr(e.s)}</div>
-          </div>`).join('');
-        return `<div class="day"><div class="dhead ${isToday ? 'is-today' : ''}">${head}</div>${rows}</div>`;
-      }).join('') : '<div class="empty">No events in the next couple of weeks.</div>';
+        const label = isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'long' });
+        const dayEvents = events.filter(e => sameDay(e.s, d)).sort((a, b) => a.s - b.s);
+        const rows = dayEvents.length ? dayEvents.map(e => `
+          <div class="devt" style="background:${pastel(e.color)}">
+            <div class="time" style="color:${deep(e.color)}">${e.all_day ? 'ALL DAY' : timeStr(e.s)}</div>
+            <div class="title">${e.title}</div>
+            ${e.location ? `<div class="loc">📍 ${e.location}</div>` : ''}
+          </div>`).join('') : '<div class="empty">No events</div>';
+        return `<div class="daycol ${isToday ? 'is-today' : ''}">
+          <div class="dname">${label}<span class="ddate">${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></div>
+          <div class="devents">${rows}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    async function refreshGrocery() {
+      let data;
+      try { data = await (await fetch('/api/grocery')).json(); }
+      catch (e) { return; }
+      const el = document.getElementById('grocery');
+      const items = data.items || [];
+      el.innerHTML = items.length ? items.map(i => `
+        <div class="gitem ${i.checked ? 'done' : ''}" onclick="toggleGrocery('${i.id}')">
+          <span class="box">${i.checked ? '✓' : ''}</span>
+          <span class="gtext">${escapeHtml(i.text)}</span>
+        </div>`).join('') : '<div class="empty-hint">List is empty — scan to add 🛒</div>';
+      const qr = document.getElementById('grocery-qr');
+      if (data.add_url && qr.dataset.url !== data.add_url) {
+        qr.dataset.url = data.add_url;
+        qr.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(data.add_url)}" alt="QR code to add grocery items">`;
+      }
+    }
+
+    async function toggleGrocery(id) {
+      try {
+        await fetch('/api/grocery/toggle', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+      } catch (e) {}
+      refreshGrocery();
+    }
+
+    async function refreshChecklist() {
+      let data;
+      try { data = await (await fetch('/api/checklist')).json(); }
+      catch (e) { return; }
+      const el = document.getElementById('checklist');
+      const items = data.items || [];
+      el.innerHTML = items.length ? items.map(i => `
+        <div class="gitem ${i.checked ? 'done' : ''}" onclick="toggleChecklist('${i.id}')">
+          <span class="box">${i.checked ? '✓' : ''}</span>
+          <span class="gtext">${escapeHtml(i.text)}</span>
+        </div>`).join('') : '<div class="empty-hint">All clear ✨ — add to-dos from your phone</div>';
+    }
+
+    async function toggleChecklist(id) {
+      try {
+        await fetch('/api/checklist/toggle', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+      } catch (e) {}
+      refreshChecklist();
+    }
+
+    async function refreshNotes() {
+      let data;
+      try { data = await (await fetch('/api/notes')).json(); }
+      catch (e) { return; }
+      const el = document.getElementById('notes');
+      const items = data.items || [];
+      el.innerHTML = items.length ? items.map(i => `
+        <div class="note-item"><span class="nmark">💛</span><span>${escapeHtml(i.text)}</span></div>`).join('')
+        : '<div class="empty-hint">No notes yet — post one from your phone 💌</div>';
+    }
+
+    async function toggleChore(i) {
+      await fetch('/api/chores/toggle', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: i }),
+      });
+      refreshBoard();
+    }
+
+    async function refreshBoard() {
+      let data;
+      try { data = await (await fetch('/api/board')).json(); }
+      catch (e) { return; }
+
+      if (data.weather) {
+        document.getElementById('weather').style.display = '';
+        document.getElementById('w-icon').textContent = data.weather.icon;
+        document.getElementById('w-temp').textContent = data.weather.temp + '°';
+        document.getElementById('w-range').textContent = `H ${data.weather.hi}° · L ${data.weather.lo}°`;
+      }
+
+      // (The static chores panel was replaced by the dynamic Today's Checklist — see refreshChecklist.)
+
+      const mealEl = document.getElementById('meal');
+      const mealQr = document.getElementById('meal-qr');
+      if (mealQr) mealQr.innerHTML = '';
+      if (data.meal_tonight) {
+        mealEl.innerHTML = `<div class="meal-name">${data.meal_tonight}</div>`;
+      } else if (data.recipe) {
+        const r = data.recipe;
+        const tags = [r.category, r.area].filter(Boolean).map(t => `<span class="tag">${t}</span>`).join('');
+        mealEl.innerHTML = `<div class="recipe">
+          <img class="thumb" src="${r.thumb}" alt="${r.name}">
+          <div class="rbody">
+            <div class="meal-name">${r.name}</div>
+            <div class="tags">${tags}</div>
+            <div class="ingredients">${r.ingredients.join(' · ')}</div>
+          </div></div>`;
+        if (mealQr && r.youtube) {
+          mealQr.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(r.youtube)}" alt="QR to recipe video">`;
+        }
+      } else {
+        mealEl.innerHTML = '<div class="empty-hint">Not set — edit config.yaml</div>';
+      }
+
+      if (data.word_of_day) {
+        const w = data.word_of_day;
+        document.getElementById('word-panel').style.display = '';
+        document.getElementById('wd-word').textContent = w.word;
+        document.getElementById('wd-phon').textContent = w.phonetic || '';
+        document.getElementById('wd-pos').textContent = w.part_of_speech;
+        document.getElementById('wd-def').textContent = w.definition;
+        if (w.example) {
+          document.getElementById('wd-ex-label').style.display = '';
+          document.getElementById('wd-ex').style.display = '';
+          document.getElementById('wd-ex').textContent = '"' + w.example + '"';
+        }
+      }
     }
 
     tick(); setInterval(tick, 1000);
-    refresh(); setInterval(refresh, 60000);   // re-pull calendars every minute
-    setInterval(refresh, 30000);              // (countdowns refresh with it)
+    refreshAgenda(); setInterval(refreshAgenda, 60000);
+    refreshBoard(); setInterval(refreshBoard, 900000);   // weather/word change slowly
+    refreshGrocery(); setInterval(refreshGrocery, 15000);
+    refreshChecklist(); setInterval(refreshChecklist, 15000);
+    refreshNotes(); setInterval(refreshNotes, 15000);
+
+    // Follow the wall "mode" set from the phone remote — jump to the Music screen.
+    setInterval(async () => {
+      try {
+        const m = (await (await fetch('/api/mode', {cache:'no-store'})).json()).mode;
+        if (m === 'music') location.href = '/music';
+      } catch (e) {}
+    }, 2000);
   </script>
 </body>
 </html>

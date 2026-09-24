@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Wall Remote</title>
+  <style>
+    :root{ --bg:#f7f2e9; --card:#ffffff; --ink:#2a2620; --muted:#8c8271; --line:#ece2ce; --accent:#d1603f; }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#1c1a17; --card:#262320; --ink:#f0e9dd; --muted:#a89a86; --line:#39332b; --accent:#e5794f; }
+    }
+    *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+    body{margin:0 auto; max-width:520px; min-height:100vh; background:var(--bg); color:var(--ink);
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif; padding:22px 16px 40px;}
+    h1{font-size:22px; margin:4px 0 18px; display:flex; align-items:center; gap:9px}
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+    .tile{background:var(--card); border:2px solid var(--line); border-radius:20px; padding:26px 16px;
+      display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; transition:.15s;
+      font-size:18px; font-weight:700; color:var(--ink);}
+    .tile .emoji{font-size:40px; line-height:1}
+    .tile .sub{font-size:12.5px; font-weight:600; color:var(--muted)}
+    .tile.active{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, var(--card));}
+    .tile.active .dot{color:var(--accent)}
+    .tile:active{transform:scale(.97)}
+    .now{margin-top:22px; background:var(--card); border:1px solid var(--line); border-radius:18px;
+      padding:14px; display:flex; align-items:center; gap:13px; min-height:78px}
+    .now .art{width:52px; height:52px; border-radius:11px; background:var(--line) center/cover no-repeat; flex:none}
+    .now .meta{flex:1; min-width:0}
+    .now .t{font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .now .a{font-size:13.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
+    .now .none{color:var(--muted); font-size:14px}
+    .hint{color:var(--muted); font-size:12.5px; text-align:center; margin-top:20px; line-height:1.5}
+  </style>
+</head>
+<body>
+  <h1>📺 Wall Remote</h1>
+  <div class="grid">
+    <div class="tile" data-mode="hub">
+      <span class="emoji">🏡</span>
+      <span>Hub</span>
+      <span class="sub">Calendar &amp; lists</span>
+    </div>
+    <div class="tile" data-mode="music">
+      <span class="emoji">🎵</span>
+      <span>Music</span>
+      <span class="sub">Lyric screen</span>
+    </div>
+  </div>
+
+  <div class="now" id="now"><span class="none">Nothing playing</span></div>
+
+  <p class="hint">Tap a tile to switch what the wall shows.<br>The wall follows within a couple of seconds.</p>
+
+  <script>
+    const esc = s => String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(path, body){
+      const o = { method: body?'POST':'GET', cache:'no-store' };
+      if(body){ o.headers={'Content-Type':'application/json'}; o.body=JSON.stringify(body); }
+      return (await fetch(path,o)).json();
+    }
+    function paint(d){
+      const mode = d.mode || 'hub';
+      document.querySelectorAll('.tile').forEach(t =>
+        t.classList.toggle('active', t.dataset.mode===mode));
+      const np = d.now || {};
+      const now = document.getElementById('now');
+      if(np.is_playing && np.track){
+        now.innerHTML = `<div class="art" style="background-image:url('${esc(np.art)}')"></div>
+          <div class="meta"><div class="t">${esc(np.track)}</div><div class="a">${esc(np.artists)}</div></div>`;
+      } else {
+        now.innerHTML = `<span class="none">Nothing playing on Spotify</span>`;
+      }
+    }
+    document.querySelectorAll('.tile').forEach(t => t.addEventListener('click', async () => {
+      paint(await api('/api/mode/set', { mode: t.dataset.mode }));
+      refresh();
+    }));
+    async function refresh(){ try{ paint(await api('/api/mode')); }catch(e){} }
+    refresh(); setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

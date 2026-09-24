@@ -3,6 +3,14 @@ __pycache__/
 *.pyc
 config.yaml
 *.db
+.bring_creds.json
+.spotify_creds.json
+.hook_token
+.chores_state.json
+.grocery_state.json
+.checklist_state.json
+.notes_state.json
 photos/
 secrets/
 .DS_Store
+.mode_state.json

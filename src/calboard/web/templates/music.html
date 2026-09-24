@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Now Playing</title>
+  <style>
+    :root{
+      --ink:#ffffff; --dim:rgba(255,255,255,.45); --dimmer:rgba(255,255,255,.26);
+      --c1:#3a2a6d; --c2:#7d3a6d; --c3:#c2543f; --c4:#245a7d;
+    }
+    *{box-sizing:border-box; margin:0; padding:0}
+    html,body{height:100%; overflow:hidden; background:#07070a; color:var(--ink);
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,"Helvetica Neue",sans-serif;
+      -webkit-font-smoothing:antialiased;}
+
+    /* ---- Living, album-art-coloured backdrop ---- */
+    #aura{position:fixed; inset:0; z-index:0; overflow:hidden; background:#07070a;
+      transition:transform .7s ease;}
+    #aura.pulse{animation:pulse .7s ease}
+    @keyframes pulse{0%{transform:scale(1)} 32%{transform:scale(1.035)} 100%{transform:scale(1)}}
+    .blob{position:absolute; width:82vmax; height:82vmax; border-radius:50%;
+      filter:blur(56px); opacity:.78; mix-blend-mode:screen; will-change:transform;
+      transition:background 1s ease;}
+    .b1{background:radial-gradient(circle,var(--c1),transparent 60%); left:-16vmax; top:-18vmax; animation:d1 15s ease-in-out infinite}
+    .b2{background:radial-gradient(circle,var(--c2),transparent 60%); right:-18vmax; top:-12vmax; animation:d2 19s ease-in-out infinite}
+    .b3{background:radial-gradient(circle,var(--c3),transparent 60%); left:-4vmax; bottom:-22vmax; animation:d3 17s ease-in-out infinite}
+    .b4{background:radial-gradient(circle,var(--c4),transparent 60%); right:-8vmax; bottom:-16vmax; animation:d4 21s ease-in-out infinite}
+    @keyframes d1{0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(28vw,22vh) scale(1.4)}}
+    @keyframes d2{0%,100%{transform:translate(0,0) scale(1.15)} 50%{transform:translate(-26vw,24vh) scale(.82)}}
+    @keyframes d3{0%,100%{transform:translate(0,0) scale(.92)} 50%{transform:translate(24vw,-22vh) scale(1.45)}}
+    @keyframes d4{0%,100%{transform:translate(0,0) scale(1.12)} 50%{transform:translate(-28vw,-18vh) scale(.88)}}
+    #fx{position:fixed; inset:0; z-index:1; pointer-events:none;}
+    #shade{position:fixed; inset:0; z-index:2; pointer-events:none;
+      background:radial-gradient(130% 100% at 50% 42%, transparent 45%, rgba(0,0,0,.5));}
+
+    .stage{position:relative; z-index:3; height:100%; display:flex; flex-direction:column;}
+
+    /* ---- Synced lyrics ---- */
+    #lyricsView{flex:1; position:relative; overflow:hidden; display:none;}
+    #lyricScroll{position:absolute; left:0; right:0; top:50%; padding:0 8vw;
+      transition:transform .6s cubic-bezier(.22,.61,.36,1);}
+    .line{font-weight:800; font-size:min(6.4vh,4.7vw); line-height:1.16; letter-spacing:-.015em;
+      padding:1.15vh 0; color:rgba(255,255,255,.24);
+      transition:color .5s ease, opacity .5s ease, transform .5s ease, filter .5s ease;
+      transform-origin:left center; text-wrap:balance; filter:blur(.4px);}
+    .line.past{color:rgba(255,255,255,.3); filter:blur(0)}
+    .line.active{color:#fff; transform:scale(1.03); filter:blur(0);
+      text-shadow:0 2px 40px rgba(255,255,255,.28);}
+
+    /* ---- Plain lyrics (gentle auto-scroll) ---- */
+    #plainView{flex:1; position:relative; overflow:hidden; display:none;}
+    #plainScroll{position:absolute; left:0; right:0; top:10vh; padding:0 8vw;
+      transition:transform .5s linear; text-align:center;}
+    .pline{font-weight:700; font-size:min(4.4vh,3.5vw); line-height:1.55;
+      color:rgba(255,255,255,.92); padding:.4vh 0; text-wrap:balance;
+      text-shadow:0 2px 30px rgba(0,0,0,.4);}
+    .pline.blank{height:2vh}
+
+    /* ---- Now-playing card (no lyrics at all) ---- */
+    #cardView{flex:1; display:none; flex-direction:column; align-items:center; justify-content:center; gap:3.4vh; padding:6vw;}
+    #cardArt{width:min(42vh,60vw); aspect-ratio:1; border-radius:20px; background:#1a1a1e center/cover no-repeat;
+      box-shadow:0 30px 90px rgba(0,0,0,.6);}
+    #cardTitle{font-weight:800; font-size:min(5vh,7vw); line-height:1.1; text-wrap:balance; text-align:center; max-width:80%}
+    #cardArtist{margin-top:1.4vh; font-size:min(2.8vh,4.5vw); color:var(--dim); font-weight:600; text-align:center}
+    #cardHint{margin-top:2vh; font-size:1.7vh; color:var(--dimmer); letter-spacing:.12em; text-transform:uppercase; text-align:center}
+
+    /* ---- Idle ---- */
+    #idleView{flex:1; display:none; flex-direction:column; align-items:center; justify-content:center;}
+    #clock{font-weight:800; font-size:18vh; line-height:1; letter-spacing:-.02em}
+    #idleDate{font-size:3.2vh; color:var(--dim); font-weight:600; margin-top:1vh}
+    #idleNote{margin-top:4vh; font-size:2vh; color:var(--dimmer); letter-spacing:.1em; text-transform:uppercase}
+
+    /* ---- Now-playing bar ---- */
+    #bar{position:relative; z-index:2; display:none; align-items:center; gap:16px; padding:18px 30px 26px;}
+    #barArt{width:56px; height:56px; border-radius:11px; background:#1a1a1e center/cover no-repeat; flex:none; box-shadow:0 6px 20px rgba(0,0,0,.55)}
+    #barMeta{flex:1; min-width:0}
+    #barTitle{font-weight:700; font-size:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    #barArtist{font-size:15px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
+    .badge{font-size:12px; color:var(--dimmer); letter-spacing:.14em; text-transform:uppercase; flex:none}
+    #prog{position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,.14)}
+    #progFill{height:100%; width:0; background:#fff; transition:width .3s linear}
+  </style>
+</head>
+<body>
+  <div id="aura"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
+  <canvas id="fx"></canvas>
+  <div id="shade"></div>
+
+  <div class="stage">
+    <div id="lyricsView"><div id="lyricScroll"></div></div>
+    <div id="plainView"><div id="plainScroll"></div></div>
+    <div id="cardView">
+      <div id="cardArt"></div>
+      <div id="cardTitle">—</div>
+      <div id="cardArtist"></div>
+      <div id="cardHint">now playing</div>
+    </div>
+    <div id="idleView">
+      <div id="clock">--:--</div>
+      <div id="idleDate"></div>
+      <div id="idleNote">♪ play something on Spotify</div>
+    </div>
+    <div id="bar">
+      <div id="barArt"></div>
+      <div id="barMeta"><div id="barTitle"></div><div id="barArtist"></div></div>
+      <div class="badge">Spotify</div>
+      <div id="prog"><div id="progFill"></div></div>
+    </div>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const aura=el('aura'), lyricsView=el('lyricsView'), lyricScroll=el('lyricScroll'),
+          plainView=el('plainView'), plainScroll=el('plainScroll'),
+          cardView=el('cardView'), idleView=el('idleView'), bar=el('bar');
+
+    const S = { trackId:null, playing:false, progress:0, duration:0, polledAt:0,
+                synced:[], plain:[], activeIdx:-2, mode:null, art:null };
+    const DEFAULT_PALETTE = ['#3a2a6d','#7d3a6d','#c2543f','#245a7d'];
+
+    const two = n => String(n).padStart(2,'0');
+    const fmtClock = () => { const d=new Date(); let h=d.getHours()%12||12; return h+':'+two(d.getMinutes()); };
+    function estPos(){ let p=S.progress+(S.playing?(performance.now()-S.polledAt):0); return S.duration?Math.min(p,S.duration):p; }
+
+    function setMode(mode){
+      if(mode===S.mode) return; S.mode=mode;
+      lyricsView.style.display = mode==='lyrics'?'block':'none';
+      plainView.style.display  = mode==='plain' ?'block':'none';
+      cardView.style.display   = mode==='card'  ?'flex':'none';
+      idleView.style.display   = mode==='idle'  ?'flex':'none';
+      bar.style.display        = mode==='idle'  ?'none':'flex';
+    }
+    function setArt(url){
+      if(url===S.art) return; S.art=url;
+      const v = url?`url("${url}")`:'';
+      el('barArt').style.backgroundImage=v; el('cardArt').style.backgroundImage=v;
+    }
+    function _rgb(s){ const m=/(\d+)\D+(\d+)\D+(\d+)/.exec(s||''); return m?[+m[1],+m[2],+m[3]]:[90,80,140]; }
+    function _hsl([r,g,b]){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,s=0,l=(mx+mn)/2;
+      if(mx!==mn){ const d=mx-mn; s=l>.5?d/(2-mx-mn):d/(mx+mn);
+        h = mx===r?(g-b)/d+(g<b?6:0): mx===g?(b-r)/d+2:(r-g)/d+4; h/=6; } return [h*360,s,l]; }
+    function _toRgb(h,s,l){ h=((h%360)+360)%360/360; const f=(p,q,t)=>{t=(t+1)%1; return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;};
+      let r,g,b; if(s===0){r=g=b=l;} else{ const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q; r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3);}
+      return `rgb(${r*255|0},${g*255|0},${b*255|0})`; }
+    // Build a vivid, lively 4-colour palette from the art's dominant colour (hue-rotated),
+    // so even a mono-colour cover paints a colourful, moving aura in the song's family.
+    let pal = DEFAULT_PALETTE.slice();
+    function applyPalette(cols){
+      let list;
+      if(!cols||!cols.length){ list=DEFAULT_PALETTE.slice(); }
+      else{
+        let [h,s,l]=_hsl(_rgb(cols[0]));
+        s=Math.min(1,Math.max(.6,s)); l=Math.min(.6,Math.max(.44,l));
+        list=[0,40,-34,74].map(o=>_toRgb(h+o,s,l));
+      }
+      const r=document.documentElement.style;
+      list.forEach((c,i)=>r.setProperty('--c'+(i+1),c));
+      pal=list;
+    }
+    function extractPalette(url){
+      return new Promise(res=>{
+        if(!url) return res(null);
+        const img=new Image(); img.crossOrigin='anonymous';
+        img.onload=()=>{ try{
+          const n=28, cv=document.createElement('canvas'); cv.width=n; cv.height=n;
+          const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,n,n);
+          const d=ctx.getImageData(0,0,n,n).data, buckets={};
+          for(let i=0;i<d.length;i+=4){
+            const r=d[i],g=d[i+1],b=d[i+2];
+            const bri=Math.max(r,g,b), sat=bri-Math.min(r,g,b);
+            if(bri<30||bri>252) continue;
+            const k=(r>>5)+'_'+(g>>5)+'_'+(b>>5);
+            const bk=buckets[k]||(buckets[k]={r:0,g:0,b:0,n:0,s:0});
+            bk.r+=r;bk.g+=g;bk.b+=b;bk.n++;bk.s+=sat+bri*0.25;
+          }
+          let arr=Object.values(buckets).map(b=>({r:b.r/b.n|0,g:b.g/b.n|0,b:b.b/b.n|0,s:b.s}));
+          arr.sort((a,b)=>b.s-a.s);
+          const picked=[];
+          for(const col of arr){ if(picked.length>=4) break;
+            if(picked.every(p=>Math.abs(p.r-col.r)+Math.abs(p.g-col.g)+Math.abs(p.b-col.b)>64)) picked.push(col); }
+          res(picked.length?picked.map(c=>`rgb(${c.r},${c.g},${c.b})`):null);
+        }catch(e){ res(null); } };
+        img.onerror=()=>res(null);
+        img.src=url;
+      });
+    }
+    function auraPulse(){ aura.classList.remove('pulse'); void aura.offsetWidth; aura.classList.add('pulse'); }
+
+    const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    function renderLyricLines(lines){
+      lyricScroll.innerHTML = lines.map(l=>`<div class="line">${esc(l.text)||'♪'}</div>`).join('');
+      S.activeIdx=-2;
+    }
+    function renderPlain(lines){
+      plainScroll.innerHTML = lines.map(t=> t?`<div class="pline">${esc(t)}</div>`:'<div class="pline blank"></div>').join('');
+      plainScroll.style.transform='translateY(0)';
+    }
+    function updateActiveLine(pos){
+      const lines=S.synced; if(!lines.length) return;
+      let idx=-1; for(let i=0;i<lines.length;i++){ if(lines[i].t<=pos+120) idx=i; else break; }
+      if(idx===S.activeIdx) return; S.activeIdx=idx;
+      const kids=lyricScroll.children;
+      for(let i=0;i<kids.length;i++) kids[i].className='line'+(i===idx?' active':'')+(i<idx?' past':'');
+      if(idx>=0&&kids[idx]){
+        const centre=kids[idx].offsetTop+kids[idx].offsetHeight/2;
+        lyricScroll.style.transform=`translateY(${-centre}px)`;
+        auraPulse(); pulseT=performance.now();
+      } else lyricScroll.style.transform='translateY(0)';
+    }
+    function updateProgress(pos){ if(S.duration) el('progFill').style.width=Math.max(0,Math.min(100,pos/S.duration*100))+'%'; }
+
+    async function loadLyrics(np){
+      S.synced=[]; S.plain=[]; renderLyricLines([]); renderPlain([]);
+      if(!np.id) return;
+      const q=new URLSearchParams({track:np.track||'',artist:np.artists||'',album:np.album||'',duration_ms:np.duration_ms||0});
+      try{ const d=await fetch('/api/lyrics?'+q).then(r=>r.json());
+        S.synced=(d&&d.synced)||[]; S.plain=((d&&d.plain)||'').split('\n');
+        renderLyricLines(S.synced); renderPlain(S.plain);
+      }catch(e){ S.synced=[]; S.plain=[]; }
+      decideMode();
+    }
+    function decideMode(){
+      if(!S.trackId){ setMode('idle'); return; }      // idle only when nothing is loaded
+      if(S.synced.length) setMode('lyrics');
+      else if(S.plain.some(l=>l.trim())) setMode('plain');
+      else setMode('card');
+    }
+
+    async function poll(){
+      let np=null;
+      try{ np=await fetch('/api/nowplaying',{cache:'no-store'}).then(r=>r.json()); }
+      catch(e){ return; }                              // transient failure → keep current state
+      if(!np) return;
+      if(np.id){                                       // a track is loaded (playing or paused)
+        const newTrack = np.id!==S.trackId;
+        S.playing = !!np.is_playing;
+        if(typeof np.progress_ms==='number'){ S.progress=np.progress_ms; S.polledAt=performance.now(); }
+        if(np.duration_ms) S.duration=np.duration_ms;
+        if(newTrack){
+          S.trackId=np.id; setArt(np.art||null);
+          el('cardTitle').textContent=np.track||'—'; el('cardArtist').textContent=np.artists||'';
+          el('barTitle').textContent=np.track||''; el('barArtist').textContent=np.artists||'';
+          extractPalette(np.art).then(applyPalette);
+          loadLyrics(np);
+        }
+        decideMode();
+      } else if(np.enabled && !np.error){              // genuinely nothing playing (not a hiccup)
+        S.playing=false; S.trackId=null; S.synced=[]; S.plain=[];
+        decideMode();
+      }
+      // else (transient error / not configured) → keep whatever we had
+    }
+    function tick(){
+      const pos=estPos();
+      if(S.mode==='lyrics'){ updateActiveLine(pos); updateProgress(pos); }
+      else if(S.mode==='plain'){
+        const f=S.duration?Math.min(1,pos/S.duration):0;
+        const max=Math.max(0, plainScroll.scrollHeight - plainView.clientHeight*0.5);
+        plainScroll.style.transform=`translateY(${-max*f}px)`; updateProgress(pos);
+      }
+      else if(S.mode==='card'){ updateProgress(pos); }
+      else if(S.mode==='idle'){
+        el('clock').textContent=fmtClock();
+        el('idleDate').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ---- Floating glow particles (clear, continuous motion) ----
+    const fx=el('fx'), fctx=fx.getContext('2d');
+    let particles=[], pulseT=-9999;
+    const rgba=(c,a)=>c.replace('rgb(','rgba(').replace(')',','+a+')');
+    function initParticles(){
+      const n=Math.max(16, Math.min(38, Math.round(innerWidth/36)));
+      particles=[];
+      for(let i=0;i<n;i++) particles.push({
+        x:Math.random()*innerWidth, y:Math.random()*innerHeight,
+        r:36+Math.random()*104, vx:(Math.random()-.5)*.28, vy:-(.05+Math.random()*.24),
+        ci:i%4, a:.10+Math.random()*.16, ph:Math.random()*6.28 });
+    }
+    function sizeFx(){ fx.width=innerWidth; fx.height=innerHeight; initParticles(); }
+    function drawFx(t){
+      fctx.clearRect(0,0,fx.width,fx.height);
+      fctx.globalCompositeOperation='screen';
+      const pulse=Math.max(0,1-(performance.now()-pulseT)/700);
+      for(const p of particles){
+        p.x+=p.vx+Math.sin(t/2600+p.ph)*.16; p.y+=p.vy;
+        if(p.y<-p.r){ p.y=innerHeight+p.r; p.x=Math.random()*innerWidth; }
+        if(p.x<-p.r) p.x=innerWidth+p.r; else if(p.x>innerWidth+p.r) p.x=-p.r;
+        const rr=p.r*(1+pulse*.16), col=pal[p.ci%pal.length];
+        const g=fctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rr);
+        g.addColorStop(0, rgba(col, Math.min(.5,p.a*(1+pulse*.6)).toFixed(3)));
+        g.addColorStop(1, rgba(col, 0));
+        fctx.fillStyle=g; fctx.beginPath(); fctx.arc(p.x,p.y,rr,0,6.29); fctx.fill();
+      }
+      requestAnimationFrame(drawFx);
+    }
+    addEventListener('resize', sizeFx);
+    sizeFx(); requestAnimationFrame(drawFx);
+
+    applyPalette(null); setMode('idle');
+    poll(); setInterval(poll,3000); requestAnimationFrame(tick);
+
+    // Follow the wall "mode" from the phone remote — leave for the Hub when asked.
+    setInterval(async () => {
+      try {
+        const m = (await (await fetch('/api/mode',{cache:'no-store'})).json()).mode;
+        if (m && m !== 'music') location.href = '/';
+      } catch (e) {}
+    }, 2000);
+  </script>
+</body>
+</html>
