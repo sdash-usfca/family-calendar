@@ -424,7 +424,9 @@ def create_app(config: Optional[Config] = None) -> Flask:
 
     @app.route("/api/mode")
     def api_mode():
-        return jsonify({"mode": _get_mode(), "now": spotify.now_playing()})
+        # Deliberately does NOT call Spotify — the wall polls this every 2s, and we
+        # must not hit a rate-limited API that often. The remote fetches /api/nowplaying.
+        return jsonify({"mode": _get_mode()})
 
     @app.route("/api/mode/set", methods=["POST"])
     def api_mode_set():

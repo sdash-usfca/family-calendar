@@ -23,6 +23,11 @@ _TOKEN_URL = "https://accounts.spotify.com/api/token"
 _API = "https://api.spotify.com/v1"
 
 _tok = {"access_token": None, "expires_at": 0.0}
+# Shared cache so N open screens don't each hammer Spotify (dev-mode is rate-limited).
+# Adaptive TTL: poll fast only while a song is actually playing; idle is lazy.
+_np = {"data": None, "at": 0.0, "backoff_until": 0.0}
+_NP_TTL_PLAYING = 5.0
+_NP_TTL_IDLE = 15.0
 
 
 def _read_creds() -> Optional[dict]:
@@ -99,29 +104,53 @@ def _access_token() -> str:
 
 
 def now_playing() -> dict:
-    """The current track (or {'is_playing': False}); never raises."""
+    """The current track (or {'is_playing': False}); cached, never raises.
+
+    Served from a shared cache for `_NP_TTL` seconds and during any 429 back-off,
+    so many open screens hit Spotify at most once per TTL and we respect its
+    Retry-After instead of hammering a rate-limited endpoint.
+    """
     if not enabled():
         return {"enabled": False, "is_playing": False}
+    now = time.time()
+    if now < _np["backoff_until"]:   # honoring a 429 Retry-After — do NOT call Spotify at all
+        return _np["data"] or {"enabled": True, "is_playing": False}
+    ttl = _NP_TTL_PLAYING if (_np["data"] and _np["data"].get("is_playing")) else _NP_TTL_IDLE
+    if _np["data"] is not None and now - _np["at"] < ttl:
+        return _np["data"]
     try:
         tok = _access_token()
         r = requests.get(_API + "/me/player/currently-playing",
                          headers={"Authorization": "Bearer " + tok}, timeout=10)
+        if r.status_code == 429:
+            try:
+                retry = int(r.headers.get("Retry-After", "10"))
+            except Exception:  # noqa: BLE001
+                retry = 10
+            _np["backoff_until"] = now + max(5, retry)
+            _np["at"] = now
+            return _np["data"] or {"enabled": True, "is_playing": False}
         if r.status_code == 204 or not r.content:
-            return {"enabled": True, "is_playing": False}
-        r.raise_for_status()
-        data = r.json()
-        item = data.get("item") or {}
-        album = item.get("album") or {}
-        return {
-            "enabled": True,
-            "is_playing": bool(data.get("is_playing")),
-            "progress_ms": data.get("progress_ms", 0),
-            "id": item.get("id"),
-            "track": item.get("name"),
-            "artists": ", ".join(a.get("name", "") for a in item.get("artists", [])),
-            "album": album.get("name"),
-            "art": (album.get("images") or [{}])[0].get("url"),
-            "duration_ms": item.get("duration_ms", 0),
-        }
-    except Exception as e:  # noqa: BLE001 — the wall should never break on Spotify hiccups
-        return {"enabled": True, "is_playing": False, "error": str(e)}
+            data = {"enabled": True, "is_playing": False}
+        else:
+            r.raise_for_status()
+            j = r.json()
+            item = j.get("item") or {}
+            album = item.get("album") or {}
+            data = {
+                "enabled": True,
+                "is_playing": bool(j.get("is_playing")),
+                "progress_ms": j.get("progress_ms", 0),
+                "id": item.get("id"),
+                "track": item.get("name"),
+                "artists": ", ".join(a.get("name", "") for a in item.get("artists", [])),
+                "album": album.get("name"),
+                "art": (album.get("images") or [{}])[0].get("url"),
+                "duration_ms": item.get("duration_ms", 0),
+            }
+        _np["data"] = data
+        _np["at"] = now
+        return data
+    except Exception as e:  # noqa: BLE001 — keep last good state; never break the wall
+        _np["at"] = now
+        return _np["data"] or {"enabled": True, "is_playing": False, "error": str(e)}

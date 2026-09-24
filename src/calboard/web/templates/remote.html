@@ -75,8 +75,15 @@
       paint(await api('/api/mode/set', { mode: t.dataset.mode }));
       refresh();
     }));
-    async function refresh(){ try{ paint(await api('/api/mode')); }catch(e){} }
-    refresh(); setInterval(refresh, 3000);
+    async function refresh(){
+      try{
+        const m = await api('/api/mode');
+        let now = {};
+        try{ now = await api('/api/nowplaying'); }catch(e){}
+        paint({ mode: m.mode, now });
+      }catch(e){}
+    }
+    refresh(); setInterval(refresh, 4000);
   </script>
 </body>
 </html>
