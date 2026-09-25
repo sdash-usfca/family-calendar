@@ -21,18 +21,32 @@
     #empty p{color:rgba(255,255,255,.6); font-size:min(2.4vh,2.4vw); max-width:26ch; line-height:1.5}
     #empty img{width:200px; height:200px; border-radius:16px; background:#fff; padding:10px}
     #empty .url{font-family:ui-monospace,monospace; color:#fff; font-size:1.8vh; margin-top:4px}
+    /* persistent little "add photos" QR, always visible over the slideshow */
+    #addchip{position:absolute; left:18px; bottom:18px; display:none; align-items:center; gap:10px;
+      background:rgba(0,0,0,.42); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.14);
+      border-radius:14px; padding:8px 12px 8px 8px;}
+    #addchip img{width:64px; height:64px; border-radius:8px; background:#fff; padding:4px; display:block}
+    #addchip .t{font-size:13px; font-weight:700; line-height:1.25}
+    #addchip .t small{display:block; font-weight:500; color:rgba(255,255,255,.6); font-size:11px}
 
     /* ---- 25% rail: YouTube (top) + Spotify (bottom) ---- */
     .rail{flex:1 1 0; min-width:0; display:flex; flex-direction:column; background:#0e0e12; border-left:1px solid rgba(255,255,255,.08);}
-    .cell{flex:1 1 0; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:6% 8%; text-align:center; position:relative;}
+    .cell{flex:1 1 0; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:6% 8%; text-align:center;}
     .cell.yt{border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 90% at 50% 30%, rgba(255,0,0,.10), transparent 70%);}
     .cell.sp{background:radial-gradient(120% 90% at 50% 70%, rgba(30,215,96,.10), transparent 70%);}
-    .cell .logo{width:min(9vh,64px); height:min(9vh,64px); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:min(5vh,34px); font-weight:900; flex:none;}
-    .cell.yt .logo{background:#ff0000; color:#fff;}
-    .cell.sp .logo{background:#1ed760; color:#0a0a0c;}
-    .cell .name{font-weight:800; font-size:min(3vh,22px); letter-spacing:.02em}
-    .cell .sub{color:rgba(255,255,255,.5); font-size:min(1.9vh,14px); line-height:1.4}
-    .clock{position:absolute; top:14px; left:0; right:0; text-align:center; color:rgba(255,255,255,.28); font-size:12px; letter-spacing:.15em; text-transform:uppercase}
+    .cell .logo{width:min(8vh,58px); height:min(8vh,58px); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:min(4.5vh,30px); font-weight:900; flex:none;}
+    .cell.yt .logo{background:#ff0000; color:#fff;} .cell.sp .logo{background:#1ed760; color:#0a0a0c;}
+    .cell .name{font-weight:800; font-size:min(2.7vh,20px); letter-spacing:.02em}
+    .cell .sub{color:rgba(255,255,255,.5); font-size:min(1.8vh,13px); line-height:1.4}
+    .clock{position:absolute; top:12px; left:0; right:0; text-align:center; color:rgba(255,255,255,.28); font-size:12px; letter-spacing:.15em; text-transform:uppercase}
+    /* YouTube live embed fills the cell */
+    #ytframe{position:absolute; inset:0; width:100%; height:100%; border:0; display:none; background:#000;}
+    /* Spotify now-playing */
+    #spnow{display:none; flex-direction:column; align-items:center; gap:10px;}
+    #spnow .art{width:min(16vh,120px); height:min(16vh,120px); border-radius:12px; background:#1a1a1e center/cover no-repeat; box-shadow:0 10px 30px rgba(0,0,0,.5)}
+    #spnow .track{font-weight:800; font-size:min(2.4vh,17px); line-height:1.2; max-width:96%}
+    #spnow .artist{color:rgba(255,255,255,.55); font-size:min(1.9vh,13px)}
+    #spnow .cta{margin-top:4px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#1ed760; font-weight:700}
   </style>
 </head>
 <body>
@@ -46,45 +60,59 @@
         <img id="qr" alt="upload QR">
         <div class="url" id="url"></div>
       </div>
+      <div id="addchip"><img id="qr2" alt=""><div class="t">Add photos<small id="chipurl"></small></div></div>
     </div>
+
     <div class="rail">
       <div class="cell yt">
         <div class="clock" id="clk"></div>
-        <div class="logo">▶</div>
-        <div class="name">YouTube</div>
-        <div class="sub">Send a video from the remote</div>
+        <div id="ytph">
+          <div class="logo">▶</div>
+          <div class="name">YouTube</div>
+          <div class="sub">Paste a link on the remote</div>
+        </div>
+        <iframe id="ytframe" allow="autoplay; encrypted-media" allowfullscreen></iframe>
       </div>
       <div class="cell sp">
-        <div class="logo">♫</div>
-        <div class="name">Spotify</div>
-        <div class="sub" id="spsub">Nothing playing</div>
+        <div id="spidle">
+          <div class="logo">♫</div>
+          <div class="name">Spotify</div>
+          <div class="sub">Nothing playing</div>
+        </div>
+        <div id="spnow">
+          <div class="art" id="spart"></div>
+          <div class="track" id="sptrack"></div>
+          <div class="artist" id="spartist"></div>
+          <div class="cta">▶ Music tab for lyrics</div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
     const imgA=document.getElementById('imgA'), imgB=document.getElementById('imgB'),
-          empty=document.getElementById('empty');
+          empty=document.getElementById('empty'), addchip=document.getElementById('addchip');
     let photos=[], idx=0, useA=true, addUrl='';
 
+    function qrFor(url){ return 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url); }
     function showEmpty(on){
       empty.style.display = on ? 'flex' : 'none';
-      if(on && addUrl){
-        document.getElementById('qr').src =
-          'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(addUrl);
+      addchip.style.display = on ? 'none' : 'flex';
+      if(addUrl){
+        document.getElementById('qr').src = qrFor(addUrl);
         document.getElementById('url').textContent = addUrl.replace(/^https?:\/\//,'');
+        document.getElementById('qr2').src = qrFor(addUrl);
+        document.getElementById('chipurl').textContent = addUrl.replace(/^https?:\/\//,'');
       }
     }
     function swapTo(n){
       if(!photos.length) return;
       const next = useA ? imgB : imgA, cur = useA ? imgA : imgB;
       next.onload = () => { next.classList.add('show'); cur.classList.remove('show'); useA=!useA; };
-      next.classList.remove('show');
-      next.src = '/media/' + encodeURIComponent(photos[n]);
+      next.classList.remove('show'); next.src = '/media/' + encodeURIComponent(photos[n]);
     }
     function advance(){ if(photos.length){ idx=(idx+1)%photos.length; swapTo(idx); } }
-
-    async function load(){
+    async function loadPhotos(){
       try{
         const d = await fetch('/api/photos',{cache:'no-store'}).then(r=>r.json());
         addUrl = d.add_url || '';
@@ -95,16 +123,41 @@
       }catch(e){}
     }
 
-    function tickClock(){
-      const d=new Date(); let h=d.getHours()%12||12;
-      document.getElementById('clk').textContent = h+':'+String(d.getMinutes()).padStart(2,'0');
+    // ---- YouTube corner ----
+    const ytframe=document.getElementById('ytframe'), ytph=document.getElementById('ytph');
+    let lastYt=null;
+    async function loadYouTube(){
+      try{
+        const id = (await fetch('/api/youtube',{cache:'no-store'}).then(r=>r.json())).id || '';
+        if(id===lastYt) return; lastYt=id;
+        if(id){ ytframe.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1&playsinline=1';
+          ytframe.style.display='block'; ytph.style.display='none'; }
+        else { ytframe.src='about:blank'; ytframe.style.display='none'; ytph.style.display='flex'; }
+      }catch(e){}
     }
 
-    load(); setInterval(load, 30000);      // pick up newly uploaded photos
-    setInterval(advance, 8000);            // slideshow pace
+    // ---- Spotify corner (live now-playing) ----
+    const spidle=document.getElementById('spidle'), spnow=document.getElementById('spnow');
+    async function loadSpotify(){
+      try{
+        const d = await fetch('/api/nowplaying',{cache:'no-store'}).then(r=>r.json());
+        if(d.is_playing && d.track){
+          document.getElementById('spart').style.backgroundImage = d.art?`url("${d.art}")`:'';
+          document.getElementById('sptrack').textContent = d.track;
+          document.getElementById('spartist').textContent = d.artists||'';
+          spnow.style.display='flex'; spidle.style.display='none';
+        } else { spnow.style.display='none'; spidle.style.display='flex'; }
+      }catch(e){}
+    }
+
+    function tickClock(){ const d=new Date(); let h=d.getHours()%12||12;
+      document.getElementById('clk').textContent = h+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+    loadPhotos(); setInterval(loadPhotos, 30000); setInterval(advance, 8000);
+    loadYouTube(); setInterval(loadYouTube, 3000);
+    loadSpotify(); setInterval(loadSpotify, 6000);
     tickClock(); setInterval(tickClock, 15000);
 
-    // Follow the wall mode from the phone remote.
     const MODE_URL={hub:'/',music:'/music',gallery:'/gallery'};
     setInterval(async()=>{ try{
       const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode;

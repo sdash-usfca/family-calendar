@@ -29,6 +29,13 @@
     .now .t{font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
     .now .a{font-size:13.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
     .now .none{color:var(--muted); font-size:14px}
+    .yt-control{display:flex; gap:8px; margin-top:20px}
+    .yt-control input{flex:1; min-width:0; font-size:15px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink)}
+    .yt-control input:focus{outline:2px solid var(--accent); border-color:var(--accent)}
+    .yt-control button{border:none; border-radius:12px; background:#ff0000; color:#fff; font-weight:700; font-size:14px; padding:0 16px; cursor:pointer}
+    #ytstatus{font-size:13px; color:var(--muted); text-align:center; margin-top:8px; min-height:16px}
+    .links{margin-top:16px; text-align:center}
+    .links a{color:var(--accent); font-weight:700; font-size:15px; text-decoration:none}
     .hint{color:var(--muted); font-size:12.5px; text-align:center; margin-top:20px; line-height:1.5}
   </style>
 </head>
@@ -53,6 +60,13 @@
   </div>
 
   <div class="now" id="now"><span class="none">Nothing playing</span></div>
+
+  <div class="yt-control">
+    <input type="text" id="ytinput" placeholder="Paste a YouTube link…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="ytsend">Play ▶</button>
+  </div>
+  <div id="ytstatus"></div>
+  <div class="links"><a href="/photos">🖼️ Manage photos</a></div>
 
   <p class="hint">Tap a tile to switch what the wall shows.<br>The wall follows within a couple of seconds.</p>
 
@@ -80,6 +94,20 @@
       paint(await api('/api/mode/set', { mode: t.dataset.mode }));
       refresh();
     }));
+
+    const ytsend=document.getElementById('ytsend'), ytinput=document.getElementById('ytinput'), ytstatus=document.getElementById('ytstatus');
+    async function sendYT(){
+      const v=ytinput.value.trim(); if(!v) return;
+      ytstatus.textContent='Sending…';
+      try{
+        const d=await api('/api/youtube/set',{url:v});
+        if(d.ok){ await api('/api/mode/set',{mode:'gallery'}); ytstatus.textContent='Playing on the wall ▶'; ytinput.value=''; refresh(); }
+        else ytstatus.textContent="Hmm — that doesn't look like a YouTube link.";
+      }catch(e){ ytstatus.textContent='Failed — try again.'; }
+      setTimeout(()=>{ ytstatus.textContent=''; }, 3500);
+    }
+    ytsend.addEventListener('click', sendYT);
+    ytinput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendYT(); });
     async function refresh(){
       try{
         const m = await api('/api/mode');

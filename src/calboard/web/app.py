@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import socket
 import uuid
@@ -25,6 +26,26 @@ _MODE_STATE_FILE = ".mode_state.json"
 _MODES = ("hub", "music", "gallery")
 _PHOTOS_DIR = "photos"
 _PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+_YOUTUBE_STATE_FILE = ".youtube_state.json"
+_YT_ID_RE = re.compile(
+    r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/|v/)|[?&]v=)([A-Za-z0-9_-]{11})")
+
+
+def _youtube_id(text: str) -> str:
+    """Extract an 11-char YouTube video id from a URL (or accept a bare id)."""
+    text = (text or "").strip()
+    m = _YT_ID_RE.search(text)
+    if m:
+        return m.group(1)
+    return text if re.fullmatch(r"[A-Za-z0-9_-]{11}", text) else ""
+
+
+def _get_youtube() -> str:
+    try:
+        with open(_YOUTUBE_STATE_FILE) as f:
+            return str(json.load(f).get("id", ""))
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _list_photos() -> list:
@@ -500,6 +521,24 @@ def create_app(config: Optional[Config] = None) -> Flask:
             except Exception:  # noqa: BLE001
                 pass
         return jsonify({"photos": _list_photos()})
+
+    # ---- YouTube corner (set from the remote) ----
+    @app.route("/api/youtube")
+    def api_youtube():
+        return jsonify({"id": _get_youtube()})
+
+    @app.route("/api/youtube/set", methods=["POST"])
+    def api_youtube_set():
+        vid = _youtube_id(str(request.get_json(force=True).get("url", "")))
+        with open(_YOUTUBE_STATE_FILE, "w") as f:
+            json.dump({"id": vid}, f)
+        return jsonify({"id": vid, "ok": bool(vid)})
+
+    @app.route("/api/youtube/clear", methods=["POST"])
+    def api_youtube_clear():
+        with open(_YOUTUBE_STATE_FILE, "w") as f:
+            json.dump({"id": ""}, f)
+        return jsonify({"id": ""})
 
     @app.route("/healthz")
     def healthz():
