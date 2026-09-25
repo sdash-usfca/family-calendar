@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+import requests
 from flask import Flask, jsonify, make_response, render_template, request, send_from_directory
 
 from .. import bring, lyrics, spotify
@@ -44,6 +45,21 @@ def _get_youtube() -> str:
     try:
         with open(_YOUTUBE_STATE_FILE) as f:
             return str(json.load(f).get("id", ""))
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _youtube_search(query: str) -> str:
+    """First video id for a search term (scrapes YouTube results; no API key)."""
+    try:
+        r = requests.get(
+            "https://www.youtube.com/results", params={"search_query": query},
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 "
+                                   "(KHTML, like Gecko) Chrome/120 Safari/537.36",
+                     "Accept-Language": "en-US,en;q=0.9"},
+            timeout=12)
+        m = re.search(r'"videoId":"([A-Za-z0-9_-]{11})"', r.text)
+        return m.group(1) if m else ""
     except Exception:  # noqa: BLE001
         return ""
 
@@ -525,11 +541,17 @@ def create_app(config: Optional[Config] = None) -> Flask:
     # ---- YouTube corner (set from the remote) ----
     @app.route("/api/youtube")
     def api_youtube():
-        return jsonify({"id": _get_youtube()})
+        return jsonify({
+            "id": _get_youtube(),
+            "remote_url": f"http://{_lan_ip()}:{config.web.port}/remote",
+        })
 
     @app.route("/api/youtube/set", methods=["POST"])
     def api_youtube_set():
-        vid = _youtube_id(str(request.get_json(force=True).get("url", "")))
+        raw = str(request.get_json(force=True).get("url", "")).strip()
+        vid = _youtube_id(raw)
+        if not vid and raw:                 # not a link/id → treat as a search term
+            vid = _youtube_search(raw)
         with open(_YOUTUBE_STATE_FILE, "w") as f:
             json.dump({"id": vid}, f)
         return jsonify({"id": vid, "ok": bool(vid)})
