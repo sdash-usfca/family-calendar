@@ -444,11 +444,13 @@
     refreshChecklist(); setInterval(refreshChecklist, 15000);
     refreshNotes(); setInterval(refreshNotes, 15000);
 
-    // Follow the wall "mode" set from the phone remote — jump to the Music screen.
+    // Follow the wall "mode" set from the phone remote.
+    const MODE_URL = { hub:'/', music:'/music', gallery:'/gallery' };
     setInterval(async () => {
       try {
         const m = (await (await fetch('/api/mode', {cache:'no-store'})).json()).mode;
-        if (m === 'music') location.href = '/music';
+        const u = MODE_URL[m];
+        if (u && u !== location.pathname) location.href = u;
       } catch (e) {}
     }, 2000);
   </script>

@@ -339,7 +339,8 @@
     } else {
       poll(); setInterval(poll,3000);
       // Follow the wall "mode" from the phone remote.
-      setInterval(async()=>{ try{ const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode; if(m&&m!=='music') location.href='/'; }catch(e){} },2000);
+      const MODE_URL={hub:'/',music:'/music',gallery:'/gallery'};
+      setInterval(async()=>{ try{ const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode; const u=MODE_URL[m]; if(u&&u!==location.pathname) location.href=u; }catch(e){} },2000);
     }
   </script>
 </body>

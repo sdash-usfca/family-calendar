@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gallery</title>
+  <style>
+    *{box-sizing:border-box; margin:0; padding:0}
+    html,body{height:100%; overflow:hidden; background:#0a0a0c; color:#fff;
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif; -webkit-font-smoothing:antialiased;}
+    .wrap{display:flex; height:100vh; width:100vw;}
+
+    /* ---- 75% photo slideshow ---- */
+    .photo{position:relative; flex:3 1 0; min-width:0; background:#000; overflow:hidden;}
+    .photo .ph{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+      opacity:0; transition:opacity 1.3s ease; will-change:opacity,transform;}
+    .photo .ph.show{opacity:1; animation:kb 18s ease-in-out forwards;}
+    @keyframes kb{0%{transform:scale(1.02)} 100%{transform:scale(1.12)}}
+    #empty{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; text-align:center; padding:6%;}
+    #empty h2{font-size:min(4vh,4vw); font-weight:800}
+    #empty p{color:rgba(255,255,255,.6); font-size:min(2.4vh,2.4vw); max-width:26ch; line-height:1.5}
+    #empty img{width:200px; height:200px; border-radius:16px; background:#fff; padding:10px}
+    #empty .url{font-family:ui-monospace,monospace; color:#fff; font-size:1.8vh; margin-top:4px}
+
+    /* ---- 25% rail: YouTube (top) + Spotify (bottom) ---- */
+    .rail{flex:1 1 0; min-width:0; display:flex; flex-direction:column; background:#0e0e12; border-left:1px solid rgba(255,255,255,.08);}
+    .cell{flex:1 1 0; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:6% 8%; text-align:center; position:relative;}
+    .cell.yt{border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 90% at 50% 30%, rgba(255,0,0,.10), transparent 70%);}
+    .cell.sp{background:radial-gradient(120% 90% at 50% 70%, rgba(30,215,96,.10), transparent 70%);}
+    .cell .logo{width:min(9vh,64px); height:min(9vh,64px); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:min(5vh,34px); font-weight:900; flex:none;}
+    .cell.yt .logo{background:#ff0000; color:#fff;}
+    .cell.sp .logo{background:#1ed760; color:#0a0a0c;}
+    .cell .name{font-weight:800; font-size:min(3vh,22px); letter-spacing:.02em}
+    .cell .sub{color:rgba(255,255,255,.5); font-size:min(1.9vh,14px); line-height:1.4}
+    .clock{position:absolute; top:14px; left:0; right:0; text-align:center; color:rgba(255,255,255,.28); font-size:12px; letter-spacing:.15em; text-transform:uppercase}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="photo">
+      <img id="imgA" class="ph" alt="">
+      <img id="imgB" class="ph" alt="">
+      <div id="empty">
+        <h2>Your photo gallery</h2>
+        <p>Upload photos from your phone and they'll drift by here.</p>
+        <img id="qr" alt="upload QR">
+        <div class="url" id="url"></div>
+      </div>
+    </div>
+    <div class="rail">
+      <div class="cell yt">
+        <div class="clock" id="clk"></div>
+        <div class="logo">▶</div>
+        <div class="name">YouTube</div>
+        <div class="sub">Send a video from the remote</div>
+      </div>
+      <div class="cell sp">
+        <div class="logo">♫</div>
+        <div class="name">Spotify</div>
+        <div class="sub" id="spsub">Nothing playing</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const imgA=document.getElementById('imgA'), imgB=document.getElementById('imgB'),
+          empty=document.getElementById('empty');
+    let photos=[], idx=0, useA=true, addUrl='';
+
+    function showEmpty(on){
+      empty.style.display = on ? 'flex' : 'none';
+      if(on && addUrl){
+        document.getElementById('qr').src =
+          'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(addUrl);
+        document.getElementById('url').textContent = addUrl.replace(/^https?:\/\//,'');
+      }
+    }
+    function swapTo(n){
+      if(!photos.length) return;
+      const next = useA ? imgB : imgA, cur = useA ? imgA : imgB;
+      next.onload = () => { next.classList.add('show'); cur.classList.remove('show'); useA=!useA; };
+      next.classList.remove('show');
+      next.src = '/media/' + encodeURIComponent(photos[n]);
+    }
+    function advance(){ if(photos.length){ idx=(idx+1)%photos.length; swapTo(idx); } }
+
+    async function load(){
+      try{
+        const d = await fetch('/api/photos',{cache:'no-store'}).then(r=>r.json());
+        addUrl = d.add_url || '';
+        const changed = (d.photos||[]).join('|') !== photos.join('|');
+        photos = d.photos || [];
+        if(!photos.length){ showEmpty(true); imgA.classList.remove('show'); imgB.classList.remove('show'); }
+        else { showEmpty(false); if(changed){ idx=Math.min(idx, photos.length-1); swapTo(idx); } }
+      }catch(e){}
+    }
+
+    function tickClock(){
+      const d=new Date(); let h=d.getHours()%12||12;
+      document.getElementById('clk').textContent = h+':'+String(d.getMinutes()).padStart(2,'0');
+    }
+
+    load(); setInterval(load, 30000);      // pick up newly uploaded photos
+    setInterval(advance, 8000);            // slideshow pace
+    tickClock(); setInterval(tickClock, 15000);
+
+    // Follow the wall mode from the phone remote.
+    const MODE_URL={hub:'/',music:'/music',gallery:'/gallery'};
+    setInterval(async()=>{ try{
+      const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode;
+      const u=MODE_URL[m]; if(u&&u!==location.pathname) location.href=u;
+    }catch(e){} },2000);
+  </script>
+</body>
+</html>

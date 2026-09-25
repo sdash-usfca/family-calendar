@@ -10,7 +10,7 @@ from datetime import date, datetime
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from flask import Flask, jsonify, make_response, render_template, request
+from flask import Flask, jsonify, make_response, render_template, request, send_from_directory
 
 from .. import bring, lyrics, spotify
 from ..calendars import get_events
@@ -22,7 +22,21 @@ _GROCERY_STATE_FILE = ".grocery_state.json"
 _CHECKLIST_STATE_FILE = ".checklist_state.json"
 _NOTES_STATE_FILE = ".notes_state.json"
 _MODE_STATE_FILE = ".mode_state.json"
-_MODES = ("hub", "music")
+_MODES = ("hub", "music", "gallery")
+_PHOTOS_DIR = "photos"
+_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+def _list_photos() -> list:
+    """Uploaded photo filenames, oldest first."""
+    try:
+        os.makedirs(_PHOTOS_DIR, exist_ok=True)
+        files = [f for f in os.listdir(_PHOTOS_DIR)
+                 if os.path.splitext(f)[1].lower() in _PHOTO_EXTS]
+        files.sort(key=lambda f: os.path.getmtime(os.path.join(_PHOTOS_DIR, f)))
+        return files
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _load_chores_state(n: int) -> list:
@@ -135,6 +149,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
     config = config or load_config()
     app = Flask(__name__)
     app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.config["MAX_CONTENT_LENGTH"] = 40 * 1024 * 1024  # 40 MB photo uploads
     tz = ZoneInfo(config.timezone)
 
     @app.route("/")
@@ -436,6 +451,55 @@ def create_app(config: Optional[Config] = None) -> Flask:
         with open(_MODE_STATE_FILE, "w") as f:
             json.dump({"mode": m}, f)
         return jsonify({"mode": m})
+
+    # ---- Gallery mode: photo slideshow + phone upload ----
+    @app.route("/gallery")
+    def gallery_page():
+        resp = make_response(render_template("gallery.html"))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.route("/photos")
+    def photos_page():
+        resp = make_response(render_template("photos.html"))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.route("/api/photos")
+    def api_photos():
+        return jsonify({
+            "photos": _list_photos(),
+            "add_url": f"http://{_lan_ip()}:{config.web.port}/photos",
+        })
+
+    @app.route("/media/<path:name>")
+    def media(name):
+        return send_from_directory(os.path.abspath(_PHOTOS_DIR), name)
+
+    @app.route("/api/photos/upload", methods=["POST"])
+    def api_photos_upload():
+        os.makedirs(_PHOTOS_DIR, exist_ok=True)
+        saved = []
+        for f in request.files.getlist("photos"):
+            if not f or not f.filename:
+                continue
+            ext = os.path.splitext(f.filename)[1].lower()
+            if ext not in _PHOTO_EXTS:
+                continue
+            name = uuid.uuid4().hex[:12] + ext
+            f.save(os.path.join(_PHOTOS_DIR, name))
+            saved.append(name)
+        return jsonify({"saved": saved, "photos": _list_photos()})
+
+    @app.route("/api/photos/delete", methods=["POST"])
+    def api_photos_delete():
+        safe = os.path.basename(str(request.get_json(force=True).get("name", "")))
+        if safe and os.path.splitext(safe)[1].lower() in _PHOTO_EXTS:
+            try:
+                os.remove(os.path.join(_PHOTOS_DIR, safe))
+            except Exception:  # noqa: BLE001
+                pass
+        return jsonify({"photos": _list_photos()})
 
     @app.route("/healthz")
     def healthz():
