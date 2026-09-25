@@ -43,13 +43,24 @@
     /* ---------- Word-scatter lyrics (synced) ---------- */
     #wordsView{position:absolute; inset:0; display:none;}
     #words{position:absolute; left:0; right:0; top:6vh; bottom:14vh;}
-    #words .w{position:absolute; font-weight:800; letter-spacing:-.01em; color:#fff; white-space:nowrap;
-      --rot:0deg; opacity:0; transform:translate(-50%,-50%) scale(.5) rotate(var(--rot));
+    #words .w{font-weight:800; letter-spacing:-.01em; color:#fff; white-space:nowrap; opacity:0;
       text-shadow:0 3px 30px rgba(0,0,0,.55); will-change:transform,opacity;}
-    #words .w.in{animation:wIn .62s cubic-bezier(.2,.75,.25,1.25) forwards}
-    #words .w.out{animation:wOut .5s ease forwards}
-    @keyframes wIn{to{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(var(--rot))}}
-    @keyframes wOut{to{opacity:0; transform:translate(-50%,-50%) scale(1.18) rotate(var(--rot))}}
+    /* scatter — random positions, pop in (unordered) */
+    #words.scatter .w{position:absolute; --rot:0deg; transform:translate(-50%,-50%) scale(.5) rotate(var(--rot));}
+    #words.scatter .w.in{animation:sIn .62s cubic-bezier(.2,.75,.25,1.25) forwards}
+    @keyframes sIn{to{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(var(--rot))}}
+    /* row styles — centered wrapped line, sequential (in reading order) */
+    #words.row{display:flex; flex-wrap:wrap; align-content:center; justify-content:center; gap:.12em .4em; padding:6vh 8vw; height:100%;}
+    #words.row .w{position:relative; font-size:min(6.6vh,5vw); line-height:1.12;}
+    #words.rise .w{transform:translateY(54px) scale(.94)}
+    #words.rise .w.in{animation:riseIn .55s cubic-bezier(.2,.8,.2,1.1) forwards}
+    @keyframes riseIn{to{opacity:1; transform:translateY(0) scale(1)}}
+    #words.slide .w{transform:translateX(-90px)}
+    #words.slide .w.in{animation:slideIn .5s cubic-bezier(.2,.8,.25,1) forwards}
+    @keyframes slideIn{to{opacity:1; transform:translateX(0)}}
+    #words.cascade .w{transform:scale(.5)}
+    #words.cascade .w.in{animation:popIn .42s cubic-bezier(.2,.8,.2,1.3) forwards}
+    @keyframes popIn{to{opacity:1; transform:scale(1)}}
 
     /* ---------- Plain lyrics (gentle scroll) ---------- */
     #plainView{position:absolute; inset:0; overflow:hidden; display:none;}
@@ -170,25 +181,33 @@
     function setArt(url){ if(url===S.art) return; S.art=url; const v=url?`url("${url}")`:'';
       el('barArt').style.backgroundImage=v; el('cardArt').style.backgroundImage=v; }
 
-    // Show the active line's words, scattered, popping into the foreground.
+    // ----- Lyric animation styles (cycle like themes) -----
+    const STYLE_ORDER=['scatter','rise','slide','cascade'];
+    let curStyle='scatter';
+    function applyStyle(s){ curStyle=STYLE_ORDER.includes(s)?s:'scatter'; }
+    const mkWord=w=>{ const s=document.createElement('span'); s.className='w'; s.textContent=w; return s; };
+    function clearWords(){
+      [...wordsEl.children].forEach(c=>{ c.style.animation='none'; c.style.transition='opacity .34s ease'; c.style.opacity='0'; setTimeout(()=>c.remove(),350); });
+    }
+    // Show the active line's words using the current animation style.
     function showWords(text, idx){
-      [...wordsEl.children].forEach(c=>{ c.classList.remove('in'); c.classList.add('out'); setTimeout(()=>c.remove(),520); });
+      clearWords();
       const words=(text||'').split(/\s+/).filter(Boolean);
-      if(!words.length){ const s=document.createElement('span'); s.className='w'; s.textContent='♪';
-        s.style.left='50%'; s.style.top='50%'; s.style.fontSize='7vh'; wordsEl.appendChild(s);
-        requestAnimationFrame(()=>s.classList.add('in')); return; }
-      const spanN=Math.min(1, words.length/6);          // tighter scatter for short lines
-      words.forEach((w,i)=>{
-        const s=document.createElement('span'); s.className='w'; s.textContent=w;
-        const rx=seeded(idx*97+i*31), ry=seeded(idx*53+i*17+7), rz=seeded(idx*13+i*41+3);
-        s.style.left=(50+(rx-.5)*58*spanN)+'%';
-        s.style.top =(50+(ry-.5)*54)+'%';
-        s.style.fontSize=(4.4+rz*4.6)+'vh';
-        s.style.setProperty('--rot',((rz-.5)*14).toFixed(1)+'deg');
-        s.style.animationDelay=(i*95)+'ms';
-        wordsEl.appendChild(s);
-        requestAnimationFrame(()=>s.classList.add('in'));
-      });
+      if(!words.length){ wordsEl.className='row cascade'; const s=mkWord('♪'); s.style.fontSize='8vh';
+        wordsEl.appendChild(s); requestAnimationFrame(()=>s.classList.add('in')); return; }
+      if(curStyle==='scatter'){
+        wordsEl.className='scatter';
+        const spanN=Math.min(1, words.length/6);        // tighter scatter for short lines
+        words.forEach((w,i)=>{ const s=mkWord(w);
+          const rx=seeded(idx*97+i*31), ry=seeded(idx*53+i*17+7), rz=seeded(idx*13+i*41+3);
+          s.style.left=(50+(rx-.5)*58*spanN)+'%'; s.style.top=(50+(ry-.5)*54)+'%';
+          s.style.fontSize=(4.4+rz*4.6)+'vh'; s.style.setProperty('--rot',((rz-.5)*14).toFixed(1)+'deg');
+          s.style.animationDelay=(i*95)+'ms'; wordsEl.appendChild(s); requestAnimationFrame(()=>s.classList.add('in')); });
+      } else {                                          // rise / slide / cascade — sequential row
+        wordsEl.className='row '+curStyle;
+        words.forEach((w,i)=>{ const s=mkWord(w); s.style.animationDelay=(i*85)+'ms';
+          wordsEl.appendChild(s); requestAnimationFrame(()=>s.classList.add('in')); });
+      }
     }
     function updateActiveLine(pos){
       const lines=S.synced; if(!lines.length) return;
@@ -229,6 +248,7 @@
           el('cardTitle').textContent=np.track||'—'; el('cardArtist').textContent=np.artists||'';
           el('barTitle').textContent=np.track||''; el('barArtist').textContent=np.artists||'';
           extractPalette(np.art).then(c=>{ applyPalette(c); applyTheme(THEME_ORDER[hashStr(np.id)%THEME_ORDER.length]); });
+          applyStyle(STYLE_ORDER[hashStr((np.id||'')+'s')%STYLE_ORDER.length]);
           loadLyrics(np);
         }
         decideMode();
@@ -274,12 +294,53 @@
     }
     addEventListener('resize', sizeFx);
 
-    applyPalette(null); applyTheme('aurora'); setMode('idle');
-    sizeFx(); requestAnimationFrame(drawFx);
-    poll(); setInterval(poll,3000); requestAnimationFrame(tick);
+    // ---- Demo mode (?demo=1) — preview the animation with NO Spotify ----
+    // Uses original placeholder lines (not any real song) on a loop, and cycles
+    // through the themes so you can see all of them. ?theme=clouds pins one.
+    function startDemo(themeParam, styleParam){
+      const LINES=[
+        {t:600, text:"Good morning to our little home"},
+        {t:2800,text:"the coffee's warm, the windows glow"},
+        {t:5000,text:"a note is waiting on the door"},
+        {t:7300,text:"today is ours to shape once more"},
+        {t:9700,text:"add the milk, remember bread"},
+        {t:11900,text:"a busy little week ahead"},
+        {t:14100,text:"but here we gather, here we stay"},
+        {t:16300,text:"our calendar lights up the day"},
+        {t:18700,text:"so press play and let it ring"},
+        {t:20900,text:"watch the colors start to swing"},
+        {t:23100,text:"every word will rise and fall"},
+        {t:25300,text:"a little magic on the wall"},
+      ];
+      S.synced=LINES; S.plain=[]; S.trackId='demo'; S.playing=true;
+      S.duration=LINES[LINES.length-1].t+2800;
+      const themes=(themeParam&&THEME_ORDER.includes(themeParam))?[themeParam]:THEME_ORDER;
+      const styles=(styleParam&&STYLE_ORDER.includes(styleParam))?[styleParam]:STYLE_ORDER;
+      const bases=['rgb(126,92,226)','rgb(86,170,214)','rgb(150,86,180)','rgb(214,120,90)'];
+      let ti=0, si=0; applyPalette([bases[0]]); applyTheme(themes[0]); applyStyle(styles[0]);
+      const showLabel=()=>{ el('barTitle').textContent='Demo · '+styles[si]+' + '+themes[ti];
+        el('barArtist').textContent='(preview · cycles automatically)'; };
+      showLabel(); setMode('lyrics');
+      const start=performance.now(); let lastPos=0;
+      setInterval(()=>{
+        const pos=(performance.now()-start)%S.duration;
+        if(pos<lastPos){ si=(si+1)%styles.length; ti=(ti+1)%themes.length;
+          applyPalette([bases[ti%bases.length]]); applyTheme(themes[ti]); applyStyle(styles[si]); showLabel(); }
+        lastPos=pos; S.progress=pos; S.polledAt=performance.now();
+      },350);
+    }
 
-    // Follow the wall "mode" from the phone remote.
-    setInterval(async()=>{ try{ const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode; if(m&&m!=='music') location.href='/'; }catch(e){} },2000);
+    const _params=new URLSearchParams(location.search);
+    applyPalette(null); applyTheme('aurora'); setMode('idle');
+    sizeFx(); requestAnimationFrame(drawFx); requestAnimationFrame(tick);
+
+    if(_params.get('demo')){
+      startDemo(_params.get('theme'), _params.get('style'));
+    } else {
+      poll(); setInterval(poll,3000);
+      // Follow the wall "mode" from the phone remote.
+      setInterval(async()=>{ try{ const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode; if(m&&m!=='music') location.href='/'; }catch(e){} },2000);
+    }
   </script>
 </body>
 </html>
