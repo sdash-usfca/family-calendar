@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YouTube</title>
+  <style>
+    html,body{margin:0; height:100%; background:#000; overflow:hidden;}
+    #player{width:100vw; height:100vh;}
+    #wait{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      color:rgba(255,255,255,.5); background:#000; font-size:3vh;
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;}
+  </style>
+</head>
+<body>
+  <div id="wait">Loading video…</div>
+  <div id="player"></div>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    let player=null, curId='';
+    const MODE_URL={hub:'/',music:'/music',gallery:'/gallery',youtube:'/youtube'};
+    async function currentId(){ try{ return (await (await fetch('/api/youtube',{cache:'no-store'})).json()).id||''; }catch(e){ return ''; } }
+
+    function onYouTubeIframeAPIReady(){
+      player = new YT.Player('player', {
+        width:'100%', height:'100%',
+        playerVars:{ autoplay:1, rel:0, modestbranding:1, playsinline:1 },
+        events:{ onReady: play, onStateChange: onState }
+      });
+    }
+    async function play(){
+      const id = await currentId();
+      if(id){ curId=id; player.loadVideoById(id); document.getElementById('wait').style.display='none'; }
+    }
+    function onState(e){
+      // When the video ends, clear it so Auto mode returns to the rotation.
+      if(e.data === YT.PlayerState.ENDED){
+        fetch('/api/youtube/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      }
+    }
+
+    // Follow mode + pick up a newly-sent video.
+    setInterval(async()=>{
+      try{
+        const d = await (await fetch('/api/mode',{cache:'no-store'})).json();
+        const view = d.view || d.mode;
+        if(view !== 'youtube'){ const u=MODE_URL[view]; if(u && u!==location.pathname) location.href=u; return; }
+        const id = await currentId();
+        if(!id){ location.href='/'; return; }                       // nothing to play
+        if(player && player.loadVideoById && id!==curId){ curId=id; player.loadVideoById(id); document.getElementById('wait').style.display='none'; }
+      }catch(e){}
+    }, 2000);
+  </script>
+</body>
+</html>

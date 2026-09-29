@@ -13,7 +13,7 @@
     body{margin:0 auto; max-width:520px; min-height:100vh; background:var(--bg); color:var(--ink);
       font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif; padding:22px 16px 40px;}
     h1{font-size:22px; margin:4px 0 18px; display:flex; align-items:center; gap:9px}
-    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+    .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
     .tile{background:var(--card); border:2px solid var(--line); border-radius:18px; padding:20px 8px;
       display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; transition:.15s;
       font-size:16px; font-weight:700; color:var(--ink);}
@@ -57,6 +57,11 @@
       <span>Gallery</span>
       <span class="sub">Photos</span>
     </div>
+    <div class="tile" data-mode="auto">
+      <span class="emoji">🔄</span>
+      <span>Auto</span>
+      <span class="sub">Rotate calendar + photos</span>
+    </div>
   </div>
 
   <div class="now" id="now"><span class="none">Nothing playing</span></div>
@@ -66,7 +71,7 @@
     <button id="ytsend">Play ▶</button>
   </div>
   <div id="ytstatus"></div>
-  <div class="links"><a href="/photos">🖼️ Manage photos</a></div>
+  <div class="links"><a href="#" id="ytstop">⏹ Stop video</a> · <a href="/photos">🖼️ Manage photos</a></div>
 
   <p class="hint">Tap a tile to switch what the wall shows.<br>The wall follows within a couple of seconds.</p>
 
@@ -101,13 +106,19 @@
       ytstatus.textContent='Sending…';
       try{
         const d=await api('/api/youtube/set',{url:v});
-        if(d.ok){ await api('/api/mode/set',{mode:'gallery'}); ytstatus.textContent='Playing on the wall ▶'; ytinput.value=''; refresh(); }
-        else ytstatus.textContent="Hmm — that doesn't look like a YouTube link.";
+        if(d.ok){ await api('/api/mode/set',{mode:'youtube'}); ytstatus.textContent='Playing full-screen on the wall ▶'; ytinput.value=''; refresh(); }
+        else ytstatus.textContent="Couldn't find that — try different words or paste a link.";
       }catch(e){ ytstatus.textContent='Failed — try again.'; }
       setTimeout(()=>{ ytstatus.textContent=''; }, 3500);
     }
     ytsend.addEventListener('click', sendYT);
     ytinput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendYT(); });
+    document.getElementById('ytstop').addEventListener('click', async e=>{
+      e.preventDefault();
+      await api('/api/youtube/clear', {});
+      ytstatus.textContent='Video stopped'; refresh();
+      setTimeout(()=>{ ytstatus.textContent=''; }, 2500);
+    });
     async function refresh(){
       try{
         const m = await api('/api/mode');

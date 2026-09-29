@@ -445,11 +445,11 @@
     refreshNotes(); setInterval(refreshNotes, 15000);
 
     // Follow the wall "mode" set from the phone remote.
-    const MODE_URL = { hub:'/', music:'/music', gallery:'/gallery' };
+    const MODE_URL = { hub:'/', music:'/music', gallery:'/gallery', youtube:'/youtube' };
     setInterval(async () => {
       try {
-        const m = (await (await fetch('/api/mode', {cache:'no-store'})).json()).mode;
-        const u = MODE_URL[m];
+        const d = await (await fetch('/api/mode', {cache:'no-store'})).json();
+        const u = MODE_URL[d.view || d.mode];
         if (u && u !== location.pathname) location.href = u;
       } catch (e) {}
     }, 2000);

@@ -164,10 +164,10 @@
     loadSpotify(); setInterval(loadSpotify, 6000);
     tickClock(); setInterval(tickClock, 15000);
 
-    const MODE_URL={hub:'/',music:'/music',gallery:'/gallery'};
+    const MODE_URL={hub:'/',music:'/music',gallery:'/gallery',youtube:'/youtube'};
     setInterval(async()=>{ try{
-      const m=(await(await fetch('/api/mode',{cache:'no-store'})).json()).mode;
-      const u=MODE_URL[m]; if(u&&u!==location.pathname) location.href=u;
+      const d=await(await fetch('/api/mode',{cache:'no-store'})).json();
+      const u=MODE_URL[d.view||d.mode]; if(u&&u!==location.pathname) location.href=u;
     }catch(e){} },2000);
   </script>
 </body>

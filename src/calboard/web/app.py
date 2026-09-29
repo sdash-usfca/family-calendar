@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import socket
+import time
 import uuid
 from datetime import date, datetime
 from typing import Optional
@@ -24,7 +25,8 @@ _GROCERY_STATE_FILE = ".grocery_state.json"
 _CHECKLIST_STATE_FILE = ".checklist_state.json"
 _NOTES_STATE_FILE = ".notes_state.json"
 _MODE_STATE_FILE = ".mode_state.json"
-_MODES = ("hub", "music", "gallery")
+_MODES = ("hub", "music", "gallery", "youtube", "auto")
+_AUTO_ROTATE_SECS = 120  # in auto mode, seconds between Calendar <-> Photos
 _PHOTOS_DIR = "photos"
 _PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _YOUTUBE_STATE_FILE = ".youtube_state.json"
@@ -476,9 +478,20 @@ def create_app(config: Optional[Config] = None) -> Flask:
 
     @app.route("/api/mode")
     def api_mode():
-        # Deliberately does NOT call Spotify — the wall polls this every 2s, and we
-        # must not hit a rate-limited API that often. The remote fetches /api/nowplaying.
-        return jsonify({"mode": _get_mode()})
+        # Returns the raw mode plus the "view" the wall should show. For explicit
+        # modes view==mode and we never touch Spotify (polled every 2s). Only in
+        # "auto" do we resolve: a set YouTube video wins, else live Spotify shows
+        # lyrics, else it rotates Calendar <-> Photos on a timer.
+        mode = _get_mode()
+        view = mode
+        if mode == "auto":
+            if _get_youtube():
+                view = "youtube"
+            elif spotify.now_playing().get("is_playing"):   # cached; only hit in auto
+                view = "music"
+            else:
+                view = "gallery" if int(time.time() // _AUTO_ROTATE_SECS) % 2 else "hub"
+        return jsonify({"mode": mode, "view": view})
 
     @app.route("/api/mode/set", methods=["POST"])
     def api_mode_set():
@@ -499,6 +512,12 @@ def create_app(config: Optional[Config] = None) -> Flask:
     @app.route("/photos")
     def photos_page():
         resp = make_response(render_template("photos.html"))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.route("/youtube")
+    def youtube_page():
+        resp = make_response(render_template("youtube.html"))
         resp.headers["Cache-Control"] = "no-store"
         return resp
 
@@ -560,6 +579,11 @@ def create_app(config: Optional[Config] = None) -> Flask:
     def api_youtube_clear():
         with open(_YOUTUBE_STATE_FILE, "w") as f:
             json.dump({"id": ""}, f)
+        # If we were in explicit full-screen YouTube mode, drop back to Gallery so
+        # the wall doesn't get stuck on an empty player.
+        if _get_mode() == "youtube":
+            with open(_MODE_STATE_FILE, "w") as f:
+                json.dump({"mode": "gallery"}, f)
         return jsonify({"id": ""})
 
     @app.route("/healthz")
