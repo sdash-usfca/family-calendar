@@ -34,6 +34,18 @@
     /* Theme: NIGHT — deep glow from below */
     body[data-theme=night] #aura{background:radial-gradient(125% 105% at 50% 118%, var(--c1), #05060a 58%);}
     body[data-theme=night] .blob{opacity:.4; filter:blur(64px);}
+    /* Theme: WAVES — deep sea, slow low drift */
+    body[data-theme=waves] #aura{background:linear-gradient(180deg,#08192e 0%,#0f2f52 60%,#164a72 100%);}
+    body[data-theme=waves] .blob{opacity:.6; filter:blur(60px);}
+    /* Theme: EMBERS — near-black with warm glow rising */
+    body[data-theme=embers] #aura{background:radial-gradient(120% 95% at 50% 120%, #6b2410, #0a0604 62%);}
+    body[data-theme=embers] .blob{opacity:.3; filter:blur(72px);}
+    /* Theme: SUNSET — warm dusk gradient */
+    body[data-theme=sunset] #aura{background:linear-gradient(180deg,#2b1a52 0%,#7d2f66 40%,#d8663c 74%,#f2b06a 100%);}
+    body[data-theme=sunset] .blob{opacity:.4; filter:blur(58px);}
+    /* Theme: NEON — dark with vivid saturated blobs + tiny bright sparks */
+    body[data-theme=neon] #aura{background:radial-gradient(circle at 50% 50%, #14002e, #05010f 72%);}
+    body[data-theme=neon] .blob{opacity:.85; filter:blur(46px); mix-blend-mode:screen;}
 
     #fx{position:fixed; inset:0; z-index:1; pointer-events:none;}
     #shade{position:fixed; inset:0; z-index:2; pointer-events:none;
@@ -123,11 +135,15 @@
     let pal=DEFAULT_PALETTE.slice(), pulseT=-9999;
 
     // ----- Themes (rotate per song) -----
-    const THEME_ORDER=['aurora','clouds','night'];
+    const THEME_ORDER=['aurora','clouds','night','waves','embers','sunset','neon'];
     const THEME_CFG={
       aurora:{ color:'palette', count:1.0, vy:[.06,.28], size:[36,140] },
       clouds:{ color:'white',   count:0.7, vy:[.03,.13], size:[70,190] },
       night:{  color:'palette', count:1.5, vy:[.04,.20], size:[8,46] },
+      waves:{  color:'palette', count:0.8, vy:[.02,.10], size:[50,170] },
+      embers:{ color:'warm',    count:1.5, vy:[.12,.36], size:[6,32] },
+      sunset:{ color:'warm',    count:0.6, vy:[.03,.12], size:[60,180] },
+      neon:{   color:'palette', count:1.7, vy:[.08,.28], size:[6,40] },
     };
     let cfg=THEME_CFG.aurora;
     const hashStr=s=>{ let h=0; for(let i=0;i<(s||'').length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h); };
@@ -285,7 +301,11 @@
         p.x+=p.vx+Math.sin(t/2600+p.ph)*.16; p.y+=p.vy;
         if(p.y<-p.r){ p.y=innerHeight+p.r; p.x=Math.random()*innerWidth; }
         if(p.x<-p.r) p.x=innerWidth+p.r; else if(p.x>innerWidth+p.r) p.x=-p.r;
-        const rr=p.r*(1+pulse*.16), col=cfg.color==='white'?'rgb(255,255,255)':pal[p.ci%pal.length];
+        let col;
+        if(cfg.color==='white') col='rgb(255,255,255)';
+        else if(cfg.color==='warm') col=['rgb(255,176,86)','rgb(255,118,58)','rgb(255,92,120)','rgb(255,206,120)'][p.ci%4];
+        else col=pal[p.ci%pal.length];
+        const rr=p.r*(1+pulse*.16);
         const g=fctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rr);
         g.addColorStop(0, rgba(col, Math.min(.5,p.a*(1+pulse*.6)).toFixed(3))); g.addColorStop(1, rgba(col,0));
         fctx.fillStyle=g; fctx.beginPath(); fctx.arc(p.x,p.y,rr,0,6.29); fctx.fill();

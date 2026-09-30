@@ -8,6 +8,7 @@ import secrets
 import socket
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -32,6 +33,34 @@ _PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _YOUTUBE_STATE_FILE = ".youtube_state.json"
 _YT_ID_RE = re.compile(
     r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/|v/)|[?&]v=)([A-Za-z0-9_-]{11})")
+_NEWS_URL = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+_NEWS_TTL = 900  # seconds between refreshes
+_news = {"items": [], "at": 0.0}
+
+
+def _get_news() -> list:
+    """Rotating headlines from Google News RSS (cached ~15 min; no API key)."""
+    now = time.time()
+    if _news["items"] and now - _news["at"] < _NEWS_TTL:
+        return _news["items"]
+    items = []
+    try:
+        r = requests.get(_NEWS_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=12)
+        root = ET.fromstring(r.content)
+        for it in root.iter("item"):
+            title = (it.findtext("title") or "").strip()
+            src = (it.findtext("source") or "").strip()
+            if src and title.endswith(" - " + src):
+                title = title[: -(len(src) + 3)].strip()
+            if title:
+                items.append({"title": title, "source": src})
+            if len(items) >= 20:
+                break
+        if items:
+            _news["items"], _news["at"] = items, now
+    except Exception:  # noqa: BLE001
+        pass
+    return items or _news["items"]
 
 
 def _youtube_id(text: str) -> str:
@@ -556,6 +585,11 @@ def create_app(config: Optional[Config] = None) -> Flask:
             except Exception:  # noqa: BLE001
                 pass
         return jsonify({"photos": _list_photos()})
+
+    # ---- News feed (gallery rail) ----
+    @app.route("/api/news")
+    def api_news():
+        return jsonify({"items": _get_news()})
 
     # ---- YouTube corner (set from the remote) ----
     @app.route("/api/youtube")
