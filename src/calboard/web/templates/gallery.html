@@ -38,6 +38,8 @@
     .newshead{font-size:min(1.8vh,12px); letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.42); font-weight:700; margin-bottom:1.6vh}
     .newsbody{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; width:100%; transition:opacity .45s ease}
     .newsbody .nt{font-weight:800; font-size:min(2.6vh,18px); line-height:1.3; text-wrap:balance; max-width:100%}
+    .newsbody .nsum{font-size:min(1.95vh,14px); color:rgba(255,255,255,.72); line-height:1.42; max-width:100%; text-wrap:pretty;
+      display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden}
     .newsbody .ns{font-size:min(1.7vh,12px); color:rgba(255,255,255,.45); font-weight:600}
     .cell .logo{width:min(8vh,58px); height:min(8vh,58px); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:min(4.5vh,30px); font-weight:900; flex:none;}
     .cell.yt .logo{background:#ff0000; color:#fff;} .cell.sp .logo{background:#1ed760; color:#0a0a0c;}
@@ -77,6 +79,7 @@
         <div class="newshead">📰 Headlines</div>
         <div class="newsbody" id="newsbody">
           <div class="nt" id="nt">Loading news…</div>
+          <div class="nsum" id="nsum"></div>
           <div class="ns" id="ns"></div>
         </div>
       </div>
@@ -176,13 +179,18 @@
     async function loadNews(){ try{ const d=await fetch('/api/news',{cache:'no-store'}).then(r=>r.json()); if(d.items&&d.items.length) news=d.items; }catch(e){} }
     function showNews(){ if(!news.length) return; const it=news[ni++%news.length];
       newsbody.style.opacity='0';
-      setTimeout(()=>{ document.getElementById('nt').textContent=it.title; document.getElementById('ns').textContent=it.source||''; newsbody.style.opacity='1'; }, 400);
+      setTimeout(()=>{
+        document.getElementById('nt').textContent=it.title;
+        document.getElementById('nsum').textContent=it.summary||'';
+        document.getElementById('ns').textContent=it.source||'';
+        newsbody.style.opacity='1';
+      }, 400);
     }
 
     loadPhotos(); setInterval(loadPhotos, 30000); setInterval(advance, 8000);
     loadYouTube(); setInterval(loadYouTube, 3000);
     loadSpotify(); setInterval(loadSpotify, 6000);
-    loadNews().then(()=>setTimeout(showNews, 300)); setInterval(loadNews, 600000); setInterval(showNews, 9000);
+    loadNews().then(()=>setTimeout(showNews, 300)); setInterval(loadNews, 600000); setInterval(showNews, 30000);
     tickClock(); setInterval(tickClock, 15000);
 
     const MODE_URL={hub:'/',music:'/music',gallery:'/gallery',youtube:'/youtube'};

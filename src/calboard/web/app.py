@@ -1,6 +1,7 @@
 """Flask app: renders the wall dashboard and serves the agenda as JSON."""
 from __future__ import annotations
 
+import html
 import json
 import os
 import re
@@ -33,33 +34,52 @@ _PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _YOUTUBE_STATE_FILE = ".youtube_state.json"
 _YT_ID_RE = re.compile(
     r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/|v/)|[?&]v=)([A-Za-z0-9_-]{11})")
-_NEWS_URL = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+_NEWS_FEEDS = [
+    ("https://feeds.npr.org/1001/rss.xml", "NPR"),          # NPR top stories (US + world)
+    ("http://feeds.bbci.co.uk/news/world/rss.xml", "BBC"),  # BBC world
+]
 _NEWS_TTL = 900  # seconds between refreshes
 _news = {"items": [], "at": 0.0}
 
 
+def _strip_html(s: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", s or ""))).strip()
+
+
+def _parse_feed(url: str, source: str) -> list:
+    out = []
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=12)
+        root = ET.fromstring(r.content)
+        for it in root.iter("item"):
+            title = _strip_html(it.findtext("title") or "")
+            summary = _strip_html(it.findtext("description") or "")
+            if len(summary) > 230:
+                summary = summary[:227].rsplit(" ", 1)[0] + "…"
+            if title:
+                out.append({"title": title, "summary": summary, "source": source})
+            if len(out) >= 12:
+                break
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
 def _get_news() -> list:
-    """Rotating headlines from Google News RSS (cached ~15 min; no API key)."""
+    """Headlines + short publisher summaries from a couple of RSS feeds (cached; no key)."""
     now = time.time()
     if _news["items"] and now - _news["at"] < _NEWS_TTL:
         return _news["items"]
-    items = []
-    try:
-        r = requests.get(_NEWS_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=12)
-        root = ET.fromstring(r.content)
-        for it in root.iter("item"):
-            title = (it.findtext("title") or "").strip()
-            src = (it.findtext("source") or "").strip()
-            if src and title.endswith(" - " + src):
-                title = title[: -(len(src) + 3)].strip()
-            if title:
-                items.append({"title": title, "source": src})
-            if len(items) >= 20:
-                break
-        if items:
-            _news["items"], _news["at"] = items, now
-    except Exception:  # noqa: BLE001
-        pass
+    feeds = [_parse_feed(u, name) for (u, name) in _NEWS_FEEDS]
+    items, i = [], 0
+    while any(i < len(f) for f in feeds):          # interleave so sources alternate
+        for f in feeds:
+            if i < len(f):
+                items.append(f[i])
+        i += 1
+    items = items[:24]
+    if items:
+        _news["items"], _news["at"] = items, now
     return items or _news["items"]
 
 
