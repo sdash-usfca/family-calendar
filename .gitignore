@@ -13,6 +13,8 @@ config.yaml
 .youtube_state.json
 .meals_state.json
 .grocery_history.json
+.countdowns_state.json
+.wall_heartbeat
 photos/
 secrets/
 .DS_Store

@@ -202,6 +202,7 @@
   <div id="nightdim" style="position:fixed;inset:0;z-index:9999;background:#000;opacity:0;pointer-events:none;transition:opacity 4s ease"></div>
   <script>
     (function(){ function nd(){ var h=new Date().getHours(); document.getElementById('nightdim').style.opacity=(h<7)?'0.82':'0'; } nd(); setInterval(nd,60000); })();
+    (function(){ function hb(){ fetch('/api/heartbeat',{method:'POST',cache:'no-store'}).catch(function(){}); } hb(); setInterval(hb,30000); })();
   </script>
 </body>
 </html>

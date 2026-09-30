@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Countdowns</title>
+  <style>
+    :root{ --bg:#f7f2e9; --card:#fff; --ink:#2a2620; --muted:#8c8271; --line:#ece2ce; --accent:#d1603f; --soon:#e8f3ea; --soon-ink:#2f7d55; }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#1c1a17; --card:#262320; --ink:#f0e9dd; --muted:#a89a86; --line:#39332b; --accent:#e5794f; --soon:#20362b; --soon-ink:#8fd6ab; }
+    }
+    *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+    body{margin:0 auto; max-width:560px; background:var(--bg); color:var(--ink); padding:20px 16px 48px;
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;}
+    h1{font-size:23px; margin:2px 0 4px; display:flex; align-items:center; gap:9px}
+    p.sub{color:var(--muted); font-size:14px; margin:0 0 18px}
+    .item{display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:14px; margin-bottom:9px; background:var(--card); border:1px solid var(--line)}
+    .item .emo{font-size:26px; flex:none; width:32px; text-align:center}
+    .item .info{flex:1; min-width:0}
+    .item .lbl{font-weight:700; font-size:16px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .item .when{font-size:12.5px; color:var(--muted); margin-top:2px}
+    .item .days{flex:none; text-align:center; min-width:58px}
+    .item .days b{display:block; font-size:22px; font-weight:800; line-height:1; color:var(--soon-ink)}
+    .item .days span{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+    .item .del{flex:none; border:none; background:transparent; color:var(--muted); font-size:20px; cursor:pointer; padding:4px 6px}
+    .empty{color:var(--muted); font-size:14px; text-align:center; padding:14px 0}
+    .sec{margin-top:24px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px}
+    .sec h2{font-size:16px; margin:0 0 12px}
+    .field{margin-bottom:11px}
+    .field label{display:block; font-size:12.5px; color:var(--muted); font-weight:700; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em}
+    .row2{display:flex; gap:10px}
+    .row2 .emojiwrap{flex:none; width:74px}
+    .row2 .labelwrap{flex:1; min-width:0}
+    input[type=text], input[type=date]{width:100%; font-size:16px; padding:10px 11px; border:1px solid var(--line); border-radius:11px; background:var(--bg); color:var(--ink)}
+    input:focus{outline:2px solid var(--accent); border-color:var(--accent)}
+    .yearly{display:flex; align-items:center; gap:9px; font-size:14px; margin:4px 0 12px}
+    .yearly input{width:20px; height:20px; accent-color:var(--accent)}
+    #addbtn{width:100%; padding:14px; border:none; border-radius:13px; background:var(--accent); color:#fff; font-size:16px; font-weight:700; cursor:pointer}
+    #status{font-size:13px; color:var(--muted); text-align:center; margin-top:10px; min-height:16px}
+    .links{margin-top:18px; text-align:center}
+    .links a{color:var(--accent); font-weight:700; font-size:15px; text-decoration:none}
+  </style>
+</head>
+<body>
+  <h1>🎉 Countdowns</h1>
+  <p class="sub">Birthdays, trips, holidays — they show on the wall, counting down.</p>
+
+  <div id="list"></div>
+
+  <div class="sec">
+    <h2>Add a countdown</h2>
+    <div class="row2">
+      <div class="field emojiwrap">
+        <label>Icon</label>
+        <input type="text" id="emoji" value="🎉" maxlength="4" inputmode="text" autocomplete="off">
+      </div>
+      <div class="field labelwrap">
+        <label>What</label>
+        <input type="text" id="label" placeholder="Dad's birthday" autocomplete="off" maxlength="40">
+      </div>
+    </div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="date">
+    </div>
+    <label class="yearly"><input type="checkbox" id="yearly"> Repeats every year (birthday / anniversary)</label>
+    <button id="addbtn">Add countdown</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="links"><a href="/remote">← Back to remote</a></div>
+
+  <script>
+    const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(path, body){
+      const o={method:body?'POST':'GET', cache:'no-store'};
+      if(body){ o.headers={'Content-Type':'application/json'}; o.body=JSON.stringify(body); }
+      return (await fetch(path,o)).json();
+    }
+    const fmt=iso=>{ try{ return new Date(iso+'T00:00:00').toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'}); }catch(e){ return iso; } };
+    function daysWord(n){ return n===0?['Today','']:n===1?[1,'day']:[n,'days']; }
+    function render(items){
+      const list=document.getElementById('list');
+      if(!items || !items.length){ list.innerHTML='<div class="empty">Nothing yet — add your first below.</div>'; return; }
+      list.innerHTML = items.map(it=>{
+        const [num,word]=daysWord(it.days);
+        return `<div class="item">
+          <span class="emo">${esc(it.emoji)}</span>
+          <div class="info">
+            <div class="lbl">${esc(it.label)}</div>
+            <div class="when">${fmt(it.date)}${it.yearly?' · yearly':''}</div>
+          </div>
+          <div class="days"><b>${it.days===0?'🎉':num}</b><span>${word}</span></div>
+          <button class="del" data-id="${esc(it.id)}" aria-label="Remove">✕</button>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.del').forEach(b=> b.addEventListener('click', async ()=>{
+        await api('/api/countdowns/remove',{id:b.dataset.id}); load();
+      }));
+    }
+    async function load(){ const d=await api('/api/countdowns'); render(d.items||[]); }
+
+    document.getElementById('addbtn').addEventListener('click', async ()=>{
+      const label=document.getElementById('label').value.trim();
+      const date=document.getElementById('date').value;
+      const emoji=document.getElementById('emoji').value.trim()||'🎉';
+      const yearly=document.getElementById('yearly').checked;
+      const st=document.getElementById('status');
+      if(!label || !date){ st.textContent='Add a name and a date.'; return; }
+      st.textContent='Saving…';
+      try{
+        await api('/api/countdowns/add',{label, date, emoji, yearly});
+        document.getElementById('label').value=''; document.getElementById('date').value='';
+        document.getElementById('emoji').value='🎉'; document.getElementById('yearly').checked=false;
+        st.textContent='Added ✓'; load();
+      }catch(e){ st.textContent='Could not save — try again.'; return; }
+      setTimeout(()=>{ st.textContent=''; }, 2500);
+    });
+
+    load();
+  </script>
+</body>
+</html>

@@ -51,5 +51,8 @@
       }catch(e){}
     }, 2000);
   </script>
+  <script>
+    (function(){ function hb(){ fetch('/api/heartbeat',{method:'POST',cache:'no-store'}).catch(function(){}); } hb(); setInterval(hb,30000); })();
+  </script>
 </body>
 </html>

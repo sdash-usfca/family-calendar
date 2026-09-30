@@ -27,6 +27,8 @@ _GROCERY_STATE_FILE = ".grocery_state.json"
 _CHECKLIST_STATE_FILE = ".checklist_state.json"
 _NOTES_STATE_FILE = ".notes_state.json"
 _MODE_STATE_FILE = ".mode_state.json"
+_WALL_HEARTBEAT_FILE = ".wall_heartbeat"     # touched by the wall so the watchdog knows it's alive
+_COUNTDOWNS_STATE_FILE = ".countdowns_state.json"
 _MODES = ("hub", "music", "gallery", "youtube", "auto")
 _AUTO_ROTATE_SECS = 120  # in auto mode, seconds between Calendar <-> Photos
 _PHOTOS_DIR = "photos"
@@ -331,6 +333,43 @@ def _meal_ingredients(meal_id: str) -> list:
         if name and name.lower() not in {n.lower() for n in out}:
             out.append(name)
     return out
+
+
+def _load_countdowns() -> list:
+    try:
+        with open(_COUNTDOWNS_STATE_FILE) as f:
+            d = json.load(f)
+        return d if isinstance(d, list) else []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _save_countdowns(items: list) -> None:
+    with open(_COUNTDOWNS_STATE_FILE, "w") as f:
+        json.dump(items, f)
+
+
+def _countdowns_view(today: date) -> list:
+    """Countdowns with days-remaining computed: yearly ones (birthdays) roll to
+    their next occurrence, past one-offs drop away, soonest first."""
+    out = []
+    for it in _load_countdowns():
+        try:
+            y, mo, dy = (int(x) for x in str(it.get("date", "")).split("-"))
+            target = date(y, mo, dy)
+        except Exception:  # noqa: BLE001
+            continue
+        if it.get("yearly"):
+            target = target.replace(year=today.year)
+            if target < today:
+                target = target.replace(year=today.year + 1)
+        days = (target - today).days
+        if days < 0:
+            continue
+        out.append({"id": it.get("id"), "label": it.get("label", ""),
+                    "emoji": it.get("emoji") or "🎉", "date": target.isoformat(),
+                    "yearly": bool(it.get("yearly")), "days": days})
+    return sorted(out, key=lambda e: e["days"])
 
 
 def create_app(config: Optional[Config] = None) -> Flask:
@@ -794,6 +833,58 @@ def create_app(config: Optional[Config] = None) -> Flask:
                 _bring_add("grocery", name, split=False)
                 added.append(name)
         return jsonify({"added": added, "skipped": skipped})
+
+    @app.route("/api/heartbeat", methods=["POST", "GET"])
+    def api_heartbeat():
+        """The wall pings this so the watchdog can tell a live display from a frozen one."""
+        try:
+            with open(_WALL_HEARTBEAT_FILE, "w") as f:
+                f.write(str(int(time.time())))
+        except Exception:  # noqa: BLE001
+            pass
+        return jsonify({"ok": True})
+
+    @app.route("/api/wall_status")
+    def api_wall_status():
+        """Seconds since the wall last checked in (-1 = never)."""
+        try:
+            with open(_WALL_HEARTBEAT_FILE) as f:
+                age = max(0, int(time.time()) - int(f.read().strip() or "0"))
+        except Exception:  # noqa: BLE001
+            age = -1
+        return jsonify({"age": age})
+
+    @app.route("/countdowns")
+    def countdowns_page():
+        resp = make_response(render_template("countdowns.html"))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.route("/api/countdowns")
+    def api_countdowns():
+        return jsonify({
+            "items": _countdowns_view(datetime.now(tz).date()),
+            "add_url": f"http://{_lan_ip()}:{config.web.port}/countdowns",
+        })
+
+    @app.route("/api/countdowns/add", methods=["POST"])
+    def api_countdowns_add():
+        b = request.get_json(force=True)
+        label = str(b.get("label", "") or "").strip()
+        d = str(b.get("date", "") or "").strip()
+        if label and d:
+            items = _load_countdowns()
+            items.append({"id": uuid.uuid4().hex[:8], "label": label[:40], "date": d,
+                          "emoji": (str(b.get("emoji", "")).strip() or "🎉")[:4],
+                          "yearly": bool(b.get("yearly"))})
+            _save_countdowns(items)
+        return jsonify({"items": _countdowns_view(datetime.now(tz).date())})
+
+    @app.route("/api/countdowns/remove", methods=["POST"])
+    def api_countdowns_remove():
+        cid = str(request.get_json(force=True).get("id", ""))
+        _save_countdowns([it for it in _load_countdowns() if it.get("id") != cid])
+        return jsonify({"items": _countdowns_view(datetime.now(tz).date())})
 
     @app.route("/healthz")
     def healthz():

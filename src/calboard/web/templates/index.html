@@ -34,6 +34,13 @@
     .nextup .ncd { color: var(--muted); }
     .binbadge { display: inline-flex; align-items: center; gap: 6px; background: #e3f3ea; color: #2c7a4b;
       border-radius: 12px; padding: 6px 13px; font-size: 14px; font-weight: 700; }
+    #countdowns { display: inline-flex; flex-wrap: wrap; gap: 10px; }
+    .cdchip { display: inline-flex; align-items: baseline; gap: 7px; background: var(--card);
+      border-radius: 12px; padding: 6px 13px; box-shadow: 0 4px 16px rgba(60,45,25,.06); font-size: 14px; }
+    .cdchip .ce { font-size: 15px; }
+    .cdchip .cl { font-weight: 700; }
+    .cdchip .cd { color: var(--accent); font-weight: 800; }
+    .cdchip.soon .cd { color: #c23a2c; }
 
     .hdr-right { display: flex; align-items: center; gap: 18px; flex: none; }
     .weather { display: flex; align-items: center; gap: 8px; background: var(--card);
@@ -161,6 +168,7 @@
       <div class="hub-strip">
         <div class="nextup" id="nextup" style="display:none"></div>
         <div class="binbadge" id="binbadge" style="display:none"></div>
+        <span id="countdowns"></span>
       </div>
     </div>
     <div class="hdr-right">
@@ -441,6 +449,17 @@
       if(qr && d.add_url) qr.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(d.add_url)}" alt="Plan meals">`;
     }
 
+    async function refreshCountdowns(){
+      let d; try{ d=await(await fetch('/api/countdowns',{cache:'no-store'})).json(); }catch(e){ return; }
+      const cesc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+      const near=(d.items||[]).filter(it=>it.days<=200).slice(0,3);
+      document.getElementById('countdowns').innerHTML = near.map(it=>{
+        const when = it.days===0 ? 'Today! 🎉' : it.days===1 ? 'Tomorrow' : `${it.days} days`;
+        return `<span class="cdchip ${it.days<=7?'soon':''}"><span class="ce">${cesc(it.emoji)}</span>`+
+          `<span class="cl">${cesc(it.label)}</span><span class="cd">${when}</span></span>`;
+      }).join('');
+    }
+
     tick(); setInterval(tick, 1000);
     refreshAgenda(); setInterval(refreshAgenda, 60000);
     refreshBoard(); setInterval(refreshBoard, 900000);   // weather/word change slowly
@@ -448,6 +467,7 @@
     refreshChecklist(); setInterval(refreshChecklist, 15000);
     refreshNotes(); setInterval(refreshNotes, 15000);
     refreshMeals(); setInterval(refreshMeals, 600000);
+    refreshCountdowns(); setInterval(refreshCountdowns, 300000);   // recompute days ~5-minutely
 
     // Follow the wall "mode" set from the phone remote.
     const MODE_URL = { hub:'/', music:'/music', gallery:'/gallery', youtube:'/youtube' };
@@ -462,6 +482,7 @@
   <div id="nightdim" style="position:fixed;inset:0;z-index:9999;background:#000;opacity:0;pointer-events:none;transition:opacity 4s ease"></div>
   <script>
     (function(){ function nd(){ var h=new Date().getHours(); document.getElementById('nightdim').style.opacity=(h<7)?'0.82':'0'; } nd(); setInterval(nd,60000); })();
+    (function(){ function hb(){ fetch('/api/heartbeat',{method:'POST',cache:'no-store'}).catch(function(){}); } hb(); setInterval(hb,30000); })();
   </script>
 </body>
 </html>
