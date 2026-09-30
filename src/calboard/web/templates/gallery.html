@@ -201,7 +201,7 @@
   </script>
   <div id="nightdim" style="position:fixed;inset:0;z-index:9999;background:#000;opacity:0;pointer-events:none;transition:opacity 4s ease"></div>
   <script>
-    (function(){ function nd(){ var h=new Date().getHours(); document.getElementById('nightdim').style.opacity=(h>=22||h<7)?'0.82':'0'; } nd(); setInterval(nd,60000); })();
+    (function(){ function nd(){ var h=new Date().getHours(); document.getElementById('nightdim').style.opacity=(h<7)?'0.82':'0'; } nd(); setInterval(nd,60000); })();
   </script>
 </body>
 </html>
