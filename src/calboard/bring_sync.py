@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 
 from . import bring as bring_mod
 
@@ -23,7 +24,36 @@ _STATE_FILES = {
     "checklist": ".checklist_state.json",
     "notes": ".notes_state.json",
 }
+_GROCERY_HISTORY_FILE = ".grocery_history.json"
 _POLL = int(os.environ.get("BRING_POLL_SECONDS", "30"))
+
+
+def _log_grocery(names: list) -> None:
+    """Record bought/added grocery items over time (name -> count, last) so the
+    meal-suggestion feature can learn what the family actually buys."""
+    if not names:
+        return
+    try:
+        hist = {}
+        if os.path.exists(_GROCERY_HISTORY_FILE):
+            with open(_GROCERY_HISTORY_FILE) as f:
+                hist = json.load(f)
+        now = time.time()
+        for n in names:
+            k = n.strip().lower()
+            if not k:
+                continue
+            e = hist.get(k) or {"name": n.strip(), "count": 0, "last": 0}
+            e["count"] = int(e.get("count", 0)) + 1
+            e["last"] = now
+            e["name"] = n.strip()
+            hist[k] = e
+        tmp = _GROCERY_HISTORY_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(hist, f)
+        os.replace(tmp, _GROCERY_HISTORY_FILE)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _write_mirror(state_file: str, items: list) -> None:
@@ -60,6 +90,7 @@ async def _main() -> int:
             async with aiohttp.ClientSession() as session:
                 bring = Bring(session, creds["email"], creds["password"])
                 await bring.login()
+                prev_grocery = set()   # grocery names seen last cycle (for history logging)
                 # Reuse this logged-in session for polling until something fails.
                 while True:
                     for _key, uuid, state_file in targets:
@@ -68,6 +99,11 @@ async def _main() -> int:
                         pairs = [{"name": bring_mod._item_name(i), "spec": bring_mod._item_spec(i)}
                                  for i in purchase if bring_mod._item_name(i)]
                         _write_mirror(state_file, bring_mod.to_mirror_items(pairs))
+                        if _key == "grocery":
+                            names = [p["name"] for p in pairs if p.get("name")]
+                            new = [n for n in names if n.lower() not in prev_grocery]
+                            _log_grocery(new)
+                            prev_grocery = {n.lower() for n in names}
                     await asyncio.sleep(_POLL)
         except Exception as e:  # noqa: BLE001 — keep the service alive across hiccups
             print(f"bring_sync: {type(e).__name__}: {e} — re-login in 60s", flush=True)

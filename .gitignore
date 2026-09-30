@@ -11,6 +11,8 @@ config.yaml
 .checklist_state.json
 .notes_state.json
 .youtube_state.json
+.meals_state.json
+.grocery_history.json
 photos/
 secrets/
 .DS_Store

@@ -131,6 +131,14 @@
     .recipe .qr { flex: none; text-align: center; }
     .recipe .qr img { width: 56px; height: 56px; border-radius: 8px; }
     .recipe .qr .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    /* Weekly meals */
+    .week { display:flex; flex-direction:column; gap:2px; }
+    .wk-row { display:flex; align-items:baseline; gap:10px; padding:4px 7px; border-radius:8px; }
+    .wk-row.today { background:rgba(63,157,107,.16); }
+    .wk-row .wk-day { width:38px; flex:none; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+    .wk-row.today .wk-day { color:#3f9d6b; }
+    .wk-row .wk-meal { flex:1; min-width:0; font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .wk-row .wk-empty { color:var(--muted); font-weight:400; }
 
     .word .whead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .word .w { font-size: 22px; font-weight: 700; }
@@ -184,7 +192,7 @@
       </section>
 
       <section class="panel" id="meal-panel">
-        <h2><span class="ic meal">🍽️</span>Dinner Tonight<span class="hdr-qr" id="meal-qr" title="Scan for the recipe"></span></h2>
+        <h2><span class="ic meal">🍽️</span>This Week<span class="hdr-qr" id="meal-qr" title="Scan to plan the week"></span></h2>
         <div id="meal"><div class="empty-hint">Loading…</div></div>
       </section>
 
@@ -400,27 +408,7 @@
 
       // (The static chores panel was replaced by the dynamic Today's Checklist — see refreshChecklist.)
 
-      const mealEl = document.getElementById('meal');
-      const mealQr = document.getElementById('meal-qr');
-      if (mealQr) mealQr.innerHTML = '';
-      if (data.meal_tonight) {
-        mealEl.innerHTML = `<div class="meal-name">${data.meal_tonight}</div>`;
-      } else if (data.recipe) {
-        const r = data.recipe;
-        const tags = [r.category, r.area].filter(Boolean).map(t => `<span class="tag">${t}</span>`).join('');
-        mealEl.innerHTML = `<div class="recipe">
-          <img class="thumb" src="${r.thumb}" alt="${r.name}">
-          <div class="rbody">
-            <div class="meal-name">${r.name}</div>
-            <div class="tags">${tags}</div>
-            <div class="ingredients">${r.ingredients.join(' · ')}</div>
-          </div></div>`;
-        if (mealQr && r.youtube) {
-          mealQr.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(r.youtube)}" alt="QR to recipe video">`;
-        }
-      } else {
-        mealEl.innerHTML = '<div class="empty-hint">Not set — edit config.yaml</div>';
-      }
+      // The "This Week" meals panel is rendered by refreshMeals().
 
       if (data.word_of_day) {
         const w = data.word_of_day;
@@ -437,12 +425,25 @@
       }
     }
 
+    async function refreshMeals(){
+      let d; try{ d=await(await fetch('/api/meals')).json(); }catch(e){ return; }
+      const meals=d.meals||{}, today=d.today, days=d.days||['mon','tue','wed','thu','fri','sat','sun'];
+      const LBL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+      const mesc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+      document.getElementById('meal').innerHTML = '<div class="week">'+days.map(k=>
+        `<div class="wk-row ${k===today?'today':''}"><span class="wk-day">${LBL[k]||k}</span>`+
+        `<span class="wk-meal">${meals[k]?mesc(meals[k]):'<span class=\"wk-empty\">—</span>'}</span></div>`).join('')+'</div>';
+      const qr=document.getElementById('meal-qr');
+      if(qr && d.add_url) qr.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(d.add_url)}" alt="Plan meals">`;
+    }
+
     tick(); setInterval(tick, 1000);
     refreshAgenda(); setInterval(refreshAgenda, 60000);
     refreshBoard(); setInterval(refreshBoard, 900000);   // weather/word change slowly
     refreshGrocery(); setInterval(refreshGrocery, 15000);
     refreshChecklist(); setInterval(refreshChecklist, 15000);
     refreshNotes(); setInterval(refreshNotes, 15000);
+    refreshMeals(); setInterval(refreshMeals, 600000);
 
     // Follow the wall "mode" set from the phone remote.
     const MODE_URL = { hub:'/', music:'/music', gallery:'/gallery', youtube:'/youtube' };

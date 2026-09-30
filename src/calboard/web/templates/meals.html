@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Weekly Meals</title>
+  <style>
+    :root{ --bg:#f7f2e9; --card:#fff; --ink:#2a2620; --muted:#8c8271; --line:#ece2ce; --accent:#d1603f; --today:#e8f3ea; --today-ink:#2f7d55; }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#1c1a17; --card:#262320; --ink:#f0e9dd; --muted:#a89a86; --line:#39332b; --accent:#e5794f; --today:#20362b; --today-ink:#8fd6ab; }
+    }
+    *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+    body{margin:0 auto; max-width:560px; background:var(--bg); color:var(--ink); padding:20px 16px 48px;
+      font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;}
+    h1{font-size:23px; margin:2px 0 4px; display:flex; align-items:center; gap:9px}
+    p.sub{color:var(--muted); font-size:14px; margin:0 0 18px}
+    .row{display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:14px; margin-bottom:8px; background:var(--card); border:1px solid var(--line)}
+    .row.today{background:var(--today); border-color:var(--today-ink)}
+    .row .day{width:44px; flex:none; font-weight:800; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+    .row.today .day{color:var(--today-ink)}
+    .row input{flex:1; min-width:0; font-size:16px; padding:9px 11px; border:1px solid var(--line); border-radius:11px; background:var(--bg); color:var(--ink)}
+    .row input:focus{outline:2px solid var(--accent); border-color:var(--accent)}
+    .sec{margin-top:26px}
+    .sec h2{font-size:17px; margin:0 0 4px; display:flex; align-items:center; gap:8px}
+    #suggestbtn{width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent); color:#fff; font-size:16px; font-weight:700; cursor:pointer; margin-top:8px}
+    #sugstatus{font-size:13px; color:var(--muted); text-align:center; margin:10px 0; min-height:16px}
+    .card{display:flex; gap:12px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:10px}
+    .card img{width:66px; height:66px; border-radius:10px; object-fit:cover; flex:none; background:var(--line)}
+    .card .info{flex:1; min-width:0}
+    .card .nm{font-weight:700; font-size:15.5px; line-height:1.2}
+    .card .uses{font-size:12px; color:var(--muted); margin-top:3px}
+    .card .assign{display:flex; gap:4px; margin-top:7px; flex-wrap:wrap}
+    .card .assign button{border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:12px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer}
+    .card .assign button:active{background:var(--accent); color:#fff}
+  </style>
+</head>
+<body>
+  <h1>🍽️ Weekly Meals</h1>
+  <p class="sub">Type each day's dinner — it shows on the wall. Or get ideas from what you buy.</p>
+
+  <div id="days"></div>
+
+  <div class="sec">
+    <h2>🍳 Ideas from your groceries</h2>
+    <button id="suggestbtn">Suggest meals from what I buy</button>
+    <div id="sugstatus"></div>
+    <div id="suglist"></div>
+  </div>
+
+  <script>
+    const DAYS=[['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
+    const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(path, body){
+      const o={method:body?'POST':'GET', cache:'no-store'};
+      if(body){ o.headers={'Content-Type':'application/json'}; o.body=JSON.stringify(body); }
+      return (await fetch(path,o)).json();
+    }
+    let today='';
+    function renderDays(meals){
+      document.getElementById('days').innerHTML = DAYS.map(([k,lbl])=>`
+        <div class="row ${k===today?'today':''}">
+          <span class="day">${lbl}</span>
+          <input data-day="${k}" value="${esc(meals[k]||'')}" placeholder="Add dinner…" autocomplete="off">
+        </div>`).join('');
+      document.querySelectorAll('input[data-day]').forEach(inp=>{
+        inp.addEventListener('change', async ()=>{ await api('/api/meals/set',{day:inp.dataset.day, meal:inp.value}); });
+      });
+    }
+    async function loadMeals(){ const d=await api('/api/meals'); today=d.today; renderDays(d.meals||{}); }
+
+    async function assign(day, meal, btn){
+      await api('/api/meals/set',{day, meal});
+      const inp=document.querySelector(`input[data-day="${day}"]`); if(inp) inp.value=meal;
+      btn.textContent='✓'; setTimeout(()=>{ loadMeals(); }, 600);
+    }
+    document.getElementById('suggestbtn').addEventListener('click', async ()=>{
+      const st=document.getElementById('sugstatus'); st.textContent='Finding meals from your groceries…';
+      const list=document.getElementById('suglist'); list.innerHTML='';
+      try{
+        const d=await api('/api/meals/suggest');
+        if(!d.suggestions || !d.suggestions.length){ st.textContent='No matches yet — add a few groceries first.'; return; }
+        st.textContent='Uses: '+ (d.ingredients||[]).join(', ');
+        list.innerHTML = d.suggestions.map((s,i)=>`
+          <div class="card">
+            <img src="${esc(s.thumb)}" alt="" loading="lazy">
+            <div class="info">
+              <div class="nm">${esc(s.name)}</div>
+              <div class="uses">uses ${esc((s.matched||[]).join(', '))}</div>
+              <div class="assign" data-meal="${esc(s.name)}">
+                ${DAYS.map(([k,lbl])=>`<button data-day="${k}">${lbl}</button>`).join('')}
+              </div>
+            </div>
+          </div>`).join('');
+        list.querySelectorAll('.assign').forEach(a=>{
+          a.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> assign(b.dataset.day, a.dataset.meal, b)));
+        });
+      }catch(e){ st.textContent='Could not load suggestions — try again.'; }
+    });
+
+    loadMeals();
+  </script>
+</body>
+</html>

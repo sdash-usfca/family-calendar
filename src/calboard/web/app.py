@@ -233,6 +233,87 @@ def _lan_ip() -> str:
         return "localhost"
 
 
+_MEALS_STATE_FILE = ".meals_state.json"
+_GROCERY_HISTORY_FILE = ".grocery_history.json"
+_MEAL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+_MEAL_SUG = {"data": None, "at": 0.0, "ings": None}
+_MEAL_SUG_TTL = 3600
+_MEAL_STOP = {"salt", "water", "sugar", "oil", "butter"}   # too generic to narrow meals
+
+
+def _get_meals() -> dict:
+    try:
+        with open(_MEALS_STATE_FILE) as f:
+            d = json.load(f)
+        return {k: str(d.get(k, "")) for k in _MEAL_DAYS}
+    except Exception:  # noqa: BLE001
+        return {k: "" for k in _MEAL_DAYS}
+
+
+_ING_DROP = {"oil", "fresh", "organic", "powder", "ground", "whole", "large", "small",
+             "boneless", "skinless", "raw", "dried", "chopped", "sliced", "canned", "frozen",
+             "low", "fat", "free", "of", "the", "a", "pack", "bottle", "box", "bag", "extra", "virgin"}
+
+
+def _norm_ing(name: str) -> str:
+    """Reduce a grocery product name to a recipe-style ingredient (e.g. 'Avocado
+    Oil' -> 'avocado', 'Chicken Breasts' -> 'chicken breast')."""
+    words = [w for w in re.sub(r"[^a-z ]", " ", (name or "").lower()).split() if w not in _ING_DROP]
+    if not words:
+        return ""
+    s = " ".join(words)
+    return s[:-1] if s.endswith("s") and not s.endswith("ss") else s
+
+
+def _grocery_ingredients(n: int = 6) -> list:
+    """Most-relevant (normalized) ingredients from the current grocery list + history."""
+    ings: dict = {}
+
+    def add(name, w):
+        k = _norm_ing(name)
+        if k and k not in _MEAL_STOP and len(k) > 1:
+            ings[k] = ings.get(k, 0) + w
+
+    for it in _load_list(_GROCERY_STATE_FILE):
+        add(it.get("name") or it.get("text") or "", 3)   # weight what's on the list now
+    try:
+        with open(_GROCERY_HISTORY_FILE) as f:
+            hist = json.load(f)
+        for _k, e in hist.items():
+            add(e.get("name", ""), min(int(e.get("count", 1)), 5))
+    except Exception:  # noqa: BLE001
+        pass
+    return [k for k, _ in sorted(ings.items(), key=lambda kv: -kv[1])][:n]
+
+
+def _meal_suggestions() -> dict:
+    """Meals (TheMealDB, free) that use the most of the family's ingredients."""
+    ings = _grocery_ingredients(6)
+    now = time.time()
+    if _MEAL_SUG["data"] and _MEAL_SUG["ings"] == ings and now - _MEAL_SUG["at"] < _MEAL_SUG_TTL:
+        return _MEAL_SUG["data"]
+    hits: dict = {}
+    for ing in ings:
+        for q in dict.fromkeys([ing, ing.split()[0]]):     # full term, then main noun
+            try:
+                r = requests.get("https://www.themealdb.com/api/json/v1/1/filter.php",
+                                 params={"i": q}, timeout=10)
+                for m in (r.json().get("meals") or [])[:20]:
+                    mid = m.get("idMeal")
+                    e = hits.get(mid) or {"id": mid, "name": m.get("strMeal"),
+                                          "thumb": m.get("strMealThumb"), "matched": set()}
+                    e["matched"].add(ing)
+                    hits[mid] = e
+            except Exception:  # noqa: BLE001
+                pass
+    ranked = sorted(hits.values(), key=lambda e: (-len(e["matched"]), e["name"] or ""))[:8]
+    data = {"ingredients": ings, "suggestions": [
+        {"id": e["id"], "name": e["name"], "thumb": e["thumb"], "matched": sorted(e["matched"])}
+        for e in ranked]}
+    _MEAL_SUG.update(data=data, at=now, ings=ings)
+    return data
+
+
 def create_app(config: Optional[Config] = None) -> Flask:
     config = config or load_config()
     app = Flask(__name__)
@@ -639,6 +720,37 @@ def create_app(config: Optional[Config] = None) -> Flask:
             with open(_MODE_STATE_FILE, "w") as f:
                 json.dump({"mode": "gallery"}, f)
         return jsonify({"id": ""})
+
+    # ---- Weekly meals + grocery-based suggestions ----
+    @app.route("/meals")
+    def meals_page():
+        resp = make_response(render_template("meals.html"))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.route("/api/meals")
+    def api_meals():
+        today = _MEAL_DAYS[datetime.now(tz).weekday()]
+        return jsonify({
+            "meals": _get_meals(), "today": today, "days": _MEAL_DAYS,
+            "add_url": f"http://{_lan_ip()}:{config.web.port}/meals",
+        })
+
+    @app.route("/api/meals/set", methods=["POST"])
+    def api_meals_set():
+        body = request.get_json(force=True)
+        day = str(body.get("day", "")).lower()
+        meal = str(body.get("meal", "") or "").strip()
+        if day in _MEAL_DAYS:
+            m = _get_meals()
+            m[day] = meal
+            with open(_MEALS_STATE_FILE, "w") as f:
+                json.dump(m, f)
+        return jsonify({"meals": _get_meals()})
+
+    @app.route("/api/meals/suggest")
+    def api_meals_suggest():
+        return jsonify(_meal_suggestions())
 
     @app.route("/healthz")
     def healthz():
