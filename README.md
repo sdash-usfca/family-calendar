@@ -1,51 +1,136 @@
-# 🗓️ family-calendar
+# 🗓️ Family Wall
 
-A colorful **wall calendar / family command center** for a Raspberry Pi + a spare
-monitor — a DIY take on the [Skylight Calendar](https://www.skylightframe.com/).
-It aggregates your Google + iCloud calendars, leads with a big **"What's Next"**
-panel (so you *never miss an appointment*), and runs full-screen as a kiosk.
+A wall-mounted **family command center** built on a Raspberry Pi and a spare
+monitor — a DIY, fully-owned alternative to the [Skylight Calendar](https://www.skylightframe.com/).
 
-Built as a custom web app (Flask + vanilla JS) — the same clean, layered pattern
-as its sibling [air-quality-monitor](../air-quality-monitor), so it's easy to
-understand and to restyle exactly how you want.
+It runs full-screen as a kiosk on a portrait-mounted display and pulls the
+household together in one place: shared **calendars**, **grocery / to-do / notes**
+lists that sync to everyone's phone, **weekly meal planning**, a synced-lyric
+**music screen**, a **photo gallery**, **news**, **YouTube**, and **countdowns**
+to the things everyone's looking forward to — all steerable from a phone, and
+built to quietly keep itself running.
 
-> 🎯 **Design goal:** stop missing doctor's appointments. The board leads with
-> upcoming events + countdowns, and (planned) **speaks reminders to a Google Nest**.
+Built as a single web app (Flask + vanilla JS, no build step) so every screen is
+easy to read, tweak, and restyle.
 
-## Features
+> 🎯 **Why:** stop missing appointments, stop the "what's for dinner / did we run
+> out of milk / whose turn is it" scramble — and have something warm and alive on
+> the wall instead of a blank monitor.
 
-- 📅 **Aggregated calendar** — Google + iCloud (and any `.ics` feed), color-coded per calendar, **no OAuth** (just private iCal URLs). Recurring events expanded correctly.
-- ⏰ **"What's Next"** — your next appointments as big color cards with live countdowns ("in 3 days").
-- 🕐 Big clock + date, week agenda grouped by day.
-- 🖥️ Runs as a Chromium **kiosk** on the wall; reachable from any phone on your LAN.
-- 🧪 **Demo mode** — sample events out of the box, so it runs on a laptop with zero setup.
+---
 
-### Planned (layered in over time)
-Nest **voice reminders** for appointments · weather · quote of the day ·
-recipe of the day (TheMealDB) · Spotify now-playing · photo slideshow · chores.
+## 📸 Screenshots
 
-## Quickstart (laptop, no setup)
+> _Add your photos to the [`screenshots/`](screenshots/) folder (see the shot list
+> there). A photo of it actually running on the wall makes the best hero image._
+
+| On the wall — Hub | Music (synced lyrics) |
+|:--:|:--:|
+| ![The Hub](screenshots/hub.jpg) | ![Lyric screen](screenshots/music.jpg) |
+| **Photo gallery + rail** | **Phone remote** |
+| ![Gallery](screenshots/gallery.jpg) | ![Remote](screenshots/remote.jpg) |
+
+---
+
+## ✨ Features
+
+### On the wall
+- 📅 **Aggregated calendar** — Google + iCloud + any `.ics` feed, color-coded per calendar, recurring events expanded. No OAuth, just private iCal URLs.
+- ⏰ **"What's Next"** — upcoming events as big cards with live countdowns, plus a bin/recycling reminder.
+- 🎉 **Countdowns** — birthdays, trips, holidays (with yearly repeat) as chips on the Hub.
+- 🍽️ **Weekly meal plan** — the week's dinners at a glance.
+- 🛒 **Shared lists** — Grocery, Checklist, and Family Notes, always in sync.
+- 🌤️ Weather, big clock, a warm time-of-day greeting, and a word of the day.
+
+### Entertainment modes
+- 🎵 **Synced-lyric music screen** — live Spotify track with time-synced lyrics (LRCLIB), animated word-by-word over a library of rotating themes and animation styles.
+- 🖼️ **Photo gallery** — Ken-Burns slideshow of your uploaded photos, with a side rail of news + now-playing.
+- ▶️ **Full-screen YouTube** — send a video by link *or* by name from your phone.
+- 📰 **News** — rotating headlines with short TL;DR summaries (NPR + BBC).
+- 🔄 **Auto mode** — when nothing's playing, gently rotates between the calendar and the gallery.
+
+### From your phone (any browser on the home network)
+- 📱 **Remote** — switch what the wall shows, control Spotify (play / pause / skip), and send YouTube.
+- 🛒 **Add to any list** — via the shared [Bring!](https://www.getbring.com/) app, so **both iPhone and Android** work.
+- 🍳 **Meal planning** — set the week's dinners, get **suggestions built from what you actually buy**, and add a recipe's ingredients to the grocery list in one tap.
+- 🖼️ Manage photos, 🎉 manage countdowns.
+
+### Runs itself
+- 🖥️ **Kiosk** — Chromium full-screen, autostarts on boot.
+- 🌙 **Night dimming** — the ambient screens fade dark overnight and come back in the morning.
+- 🛡️ **Self-healing watchdog** — reconnects WiFi, restarts the app, and reloads a frozen display automatically, so it doesn't need babysitting.
+
+---
+
+## 🧰 Hardware
+
+- **Raspberry Pi 5** (a Pi 4 works too)
+- Any HDMI monitor — **mounted portrait** here, but landscape works
+- microSD card + power; that's it. No cloud, no subscription.
+
+---
+
+## 🏗️ How it works
+
+A single Flask app (`calboard`) serves every screen and a small JSON API; the
+wall's Chromium and your phone are both just browsers pointed at it.
+
+| Piece | What it does |
+|---|---|
+| `web/app.py` | Flask routes + the JSON API for every screen |
+| `web/templates/` | Each screen (hub, music, gallery, youtube, remote, meals, …) — vanilla JS, no framework |
+| `bring.py` / `bring_sync.py` | Two-way sync of the three lists with **Bring!** |
+| `spotify.py` | Now-playing + playback control (Spotify Web API) |
+| `lyrics.py` | Time-synced lyrics (LRCLIB) |
+| `widgets.py` | Weather, word/recipe of the day |
+| `scripts/wall-watchdog.sh` | The self-healing watchdog (runs via a systemd timer) |
+
+**Integrations — all optional, all free, most need no API key:**
+Google/iCloud iCal · [Bring!](https://www.getbring.com/) · [Spotify](https://developer.spotify.com/) · [LRCLIB](https://lrclib.net/) · [TheMealDB](https://www.themealdb.com/) · NPR/BBC RSS.
+
+On the Pi it runs as systemd services — `calboard` (web), `bring-sync` (list
+sync), and `wall-watchdog` (the timer) — and updates deploy with a simple
+`rsync` + service restart.
+
+---
+
+## 🚀 Quickstart (on a laptop, zero setup)
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-cp config.example.yaml config.yaml     # demo: true — sample events
+cp config.example.yaml config.yaml     # ships with demo: true → sample events
 calboard-web                           # → http://localhost:8000
 ```
 
-## Add your real calendars
+Everything runs in **demo mode** out of the box — sample events, no accounts
+needed — so you can see the whole thing before wiring up anything real.
 
-Edit `config.yaml`, set `demo: false`, and paste your private iCal URLs:
+## 🔧 Make it yours
+
+Edit `config.yaml`, set `demo: false`, and add your calendars:
 - **Google Calendar** → Settings → *your calendar* → **"Secret address in iCal format"**
 - **iCloud** → share a calendar → make it **Public** → copy the link → change `webcal://` to `https://`
 
-Give each a `name` and `color`.
+Give each a `name` and `color`. Every other integration (Bring!, Spotify, meals,
+news, photos) is optional and layers on top — the wall works with just calendars.
 
-## On the Raspberry Pi
+## 🖥️ On the Raspberry Pi
 
-Install the venv + deps, run `calboard-web` as a service, and point Chromium
-(kiosk) at `http://localhost:8000`. (Deploy notes coming as we set it up.)
+Install the venv + dependencies, run `calboard-web` as a systemd service, and
+launch Chromium in kiosk mode pointed at `http://localhost:8000`. Deploy updates
+by `rsync`-ing the working tree to the Pi and restarting the service.
+
+---
+
+## 🔒 A note on privacy
+
+This repo is public, but **no credentials or personal data are in it** — every
+secret (calendar URLs, Bring!/Spotify logins, tokens) lives only on the device in
+`0600`, git-ignored files, and all state (photos, lists, meals, countdowns) stays
+local. Nothing is sent to any third party beyond the optional integrations you
+choose to enable.
 
 ## License
 
-MIT
+MIT — build your own, make it yours.
