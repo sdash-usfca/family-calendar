@@ -103,6 +103,39 @@ def _access_token() -> str:
     return _tok["access_token"]
 
 
+def control(action: str) -> dict:
+    """play / pause / next / previous / toggle on the user's active Spotify device.
+
+    Needs the ``user-modify-playback-state`` scope (Premium). Acts on whatever
+    device Spotify Connect currently has active. Never raises.
+    """
+    if not enabled():
+        return {"ok": False, "error": "not_connected"}
+    action = (action or "").lower()
+    if action == "toggle":
+        action = "pause" if now_playing().get("is_playing") else "play"
+    verbs = {"play": ("put", "/me/player/play"), "pause": ("put", "/me/player/pause"),
+             "next": ("post", "/me/player/next"), "previous": ("post", "/me/player/previous")}
+    if action not in verbs:
+        return {"ok": False, "error": "bad_action"}
+    method, path = verbs[action]
+    try:
+        tok = _access_token()
+        r = getattr(requests, method)(_API + path,
+                                      headers={"Authorization": "Bearer " + tok}, timeout=10)
+        if r.status_code == 404:
+            return {"ok": False, "error": "no_device"}   # no active Spotify device
+        if r.status_code == 403:
+            return {"ok": False, "error": "forbidden"}   # Premium / scope required
+        if r.status_code == 429:
+            return {"ok": False, "error": "rate_limited"}
+        r.raise_for_status()
+        _np["at"] = 0.0   # force a fresh now_playing on the next poll so the UI catches up
+        return {"ok": True, "action": action}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
 def now_playing() -> dict:
     """The current track (or {'is_playing': False}); cached, never raises.
 

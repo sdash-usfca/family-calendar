@@ -32,6 +32,9 @@
     .card .assign{display:flex; gap:4px; margin-top:7px; flex-wrap:wrap}
     .card .assign button{border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:12px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer}
     .card .assign button:active{background:var(--accent); color:#fff}
+    .card .tobuy{margin-top:8px; width:100%; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:13px; font-weight:700; border-radius:9px; padding:8px; cursor:pointer}
+    .card .tobuy:active{background:var(--accent); color:#fff}
+    .card .tobuy:disabled{opacity:.75; cursor:default}
   </style>
 </head>
 <body>
@@ -73,6 +76,16 @@
       const inp=document.querySelector(`input[data-day="${day}"]`); if(inp) inp.value=meal;
       btn.textContent='✓'; setTimeout(()=>{ loadMeals(); }, 600);
     }
+
+    async function toGrocery(id, btn){
+      const old=btn.textContent; btn.disabled=true; btn.textContent='Adding…';
+      try{
+        const d=await api('/api/meals/to_grocery',{id});
+        const n=(d.added||[]).length, sk=(d.skipped||[]).length;
+        btn.textContent = n ? `✓ Added ${n}${sk?` (${sk} already listed)`:''}` : (sk?'✓ Already on your list':'Nothing to add');
+      }catch(e){ btn.textContent='Try again'; btn.disabled=false; return; }
+      setTimeout(()=>{ btn.textContent=old; btn.disabled=false; }, 3500);
+    }
     document.getElementById('suggestbtn').addEventListener('click', async ()=>{
       const st=document.getElementById('sugstatus'); st.textContent='Finding meals from your groceries…';
       const list=document.getElementById('suglist'); list.innerHTML='';
@@ -89,11 +102,13 @@
               <div class="assign" data-meal="${esc(s.name)}">
                 ${DAYS.map(([k,lbl])=>`<button data-day="${k}">${lbl}</button>`).join('')}
               </div>
+              <button class="tobuy" data-id="${esc(s.id)}">🛒 Add ingredients to grocery</button>
             </div>
           </div>`).join('');
         list.querySelectorAll('.assign').forEach(a=>{
           a.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> assign(b.dataset.day, a.dataset.meal, b)));
         });
+        list.querySelectorAll('.tobuy').forEach(b=> b.addEventListener('click', ()=> toGrocery(b.dataset.id, b)));
       }catch(e){ st.textContent='Could not load suggestions — try again.'; }
     });
 

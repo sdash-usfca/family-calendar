@@ -19,7 +19,7 @@
 
     header { display: flex; align-items: flex-start; justify-content: space-between;
       padding: 24px 32px 10px; gap: 20px; flex: none; }
-    .greeting { color: var(--muted); font-size: 15px; margin-bottom: 2px; }
+    .greeting { color: var(--muted); font-size: 16px; font-weight: 600; margin-bottom: 3px; }
     .today-date { font-size: 34px; font-weight: 700; line-height: 1.1; }
     .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
     .legend .who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
@@ -236,8 +236,12 @@
     function tick() {
       const now = new Date();
       const h = now.getHours();
-      document.getElementById('greeting').textContent =
-        h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      const g = h < 5  ? ['🌙', 'Still up? Good night']
+              : h < 12 ? ['☀️', 'Good morning']
+              : h < 17 ? ['🌤️', 'Good afternoon']
+              : h < 21 ? ['🌆', 'Good evening']
+              :          ['🌙', 'Good night'];
+      document.getElementById('greeting').textContent = g[0] + '  ' + g[1];
       document.getElementById('today-date').textContent =
         now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
       const parts = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).split(' ');
@@ -454,6 +458,10 @@
         if (u && u !== location.pathname) location.href = u;
       } catch (e) {}
     }, 2000);
+  </script>
+  <div id="nightdim" style="position:fixed;inset:0;z-index:9999;background:#000;opacity:0;pointer-events:none;transition:opacity 4s ease"></div>
+  <script>
+    (function(){ function nd(){ var h=new Date().getHours(); document.getElementById('nightdim').style.opacity=(h>=22||h<7)?'0.82':'0'; } nd(); setInterval(nd,60000); })();
   </script>
 </body>
 </html>

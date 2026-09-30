@@ -29,6 +29,11 @@
     .now .t{font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
     .now .a{font-size:13.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
     .now .none{color:var(--muted); font-size:14px}
+    .spctrl{display:flex; gap:10px; margin-top:12px; justify-content:center}
+    .spctrl[hidden]{display:none}
+    .spctrl button{flex:1; max-width:130px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:24px; border-radius:14px; padding:12px 0; cursor:pointer; transition:.12s}
+    .spctrl button:active{transform:scale(.95); background:var(--accent); color:#fff; border-color:var(--accent)}
+    #spstatus{font-size:13px; color:var(--muted); text-align:center; margin-top:8px; min-height:16px}
     .yt-control{display:flex; gap:8px; margin-top:20px}
     .yt-control input{flex:1; min-width:0; font-size:15px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink)}
     .yt-control input:focus{outline:2px solid var(--accent); border-color:var(--accent)}
@@ -65,6 +70,12 @@
   </div>
 
   <div class="now" id="now"><span class="none">Nothing playing</span></div>
+  <div class="spctrl" id="spctrl" hidden>
+    <button data-act="previous" aria-label="Previous">⏮</button>
+    <button data-act="toggle" id="spToggle" aria-label="Play/Pause">⏯</button>
+    <button data-act="next" aria-label="Next">⏭</button>
+  </div>
+  <div id="spstatus"></div>
 
   <div class="yt-control">
     <input type="text" id="ytinput" placeholder="YouTube link or video name…" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -94,10 +105,29 @@
       } else {
         now.innerHTML = `<span class="none">Nothing playing on Spotify</span>`;
       }
+      const sp = document.getElementById('spctrl');
+      sp.hidden = !np.enabled;
+      document.getElementById('spToggle').textContent = np.is_playing ? '⏸' : '▶';
     }
     document.querySelectorAll('.tile').forEach(t => t.addEventListener('click', async () => {
       paint(await api('/api/mode/set', { mode: t.dataset.mode }));
       refresh();
+    }));
+
+    const spstatus=document.getElementById('spstatus');
+    document.querySelectorAll('#spctrl button').forEach(b => b.addEventListener('click', async () => {
+      spstatus.textContent='';
+      try{
+        const r = await api('/api/spotify/control', { action: b.dataset.act });
+        if(!r.ok){
+          spstatus.textContent = r.error==='no_device' ? 'Open Spotify on a device first'
+            : r.error==='forbidden' ? 'Playback control needs Spotify Premium'
+            : r.error==='rate_limited' ? 'Spotify busy — try again'
+            : 'Could not control playback';
+        }
+      }catch(e){ spstatus.textContent='Could not control playback'; }
+      setTimeout(refresh, 500);   // give Spotify a moment, then repaint state
+      setTimeout(()=>{ spstatus.textContent=''; }, 3500);
     }));
 
     const ytsend=document.getElementById('ytsend'), ytinput=document.getElementById('ytinput'), ytstatus=document.getElementById('ytstatus');

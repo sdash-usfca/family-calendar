@@ -314,6 +314,25 @@ def _meal_suggestions() -> dict:
     return data
 
 
+def _meal_ingredients(meal_id: str) -> list:
+    """Ingredient names for one meal (TheMealDB lookup) — for one-tap 'add to grocery'."""
+    try:
+        r = requests.get("https://www.themealdb.com/api/json/v1/1/lookup.php",
+                         params={"i": meal_id}, timeout=10)
+        meals = r.json().get("meals") or []
+    except Exception:  # noqa: BLE001
+        return []
+    if not meals:
+        return []
+    m = meals[0]
+    out = []
+    for i in range(1, 21):
+        name = (m.get(f"strIngredient{i}") or "").strip()
+        if name and name.lower() not in {n.lower() for n in out}:
+            out.append(name)
+    return out
+
+
 def create_app(config: Optional[Config] = None) -> Flask:
     config = config or load_config()
     app = Flask(__name__)
@@ -569,6 +588,11 @@ def create_app(config: Optional[Config] = None) -> Flask:
     def api_nowplaying():
         return jsonify(spotify.now_playing())
 
+    @app.route("/api/spotify/control", methods=["POST"])
+    def api_spotify_control():
+        action = str(request.get_json(force=True).get("action", "") or "")
+        return jsonify(spotify.control(action))
+
     @app.route("/api/lyrics")
     def api_lyrics():
         return jsonify(lyrics.get_synced(
@@ -751,6 +775,25 @@ def create_app(config: Optional[Config] = None) -> Flask:
     @app.route("/api/meals/suggest")
     def api_meals_suggest():
         return jsonify(_meal_suggestions())
+
+    @app.route("/api/meals/to_grocery", methods=["POST"])
+    def api_meals_to_grocery():
+        """One tap: add a suggested meal's ingredients to the Bring! grocery list,
+        skipping anything already on it."""
+        mid = str(request.get_json(force=True).get("id", "") or "")
+        ings = _meal_ingredients(mid)
+        if not ings:
+            return jsonify({"added": [], "skipped": []})
+        have = {(it.get("name") or it.get("text") or "").strip().lower()
+                for it in _load_list(_GROCERY_STATE_FILE)}
+        added, skipped = [], []
+        for name in ings:
+            if name.strip().lower() in have:
+                skipped.append(name)
+            else:
+                _bring_add("grocery", name, split=False)
+                added.append(name)
+        return jsonify({"added": added, "skipped": skipped})
 
     @app.route("/healthz")
     def healthz():
