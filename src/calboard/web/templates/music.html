@@ -167,13 +167,16 @@
         img.onload=()=>{ try{
           const n=28,cv=document.createElement('canvas'); cv.width=n;cv.height=n;
           const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,n,n); const d=ctx.getImageData(0,0,n,n).data,bk={};
+          let lumSum=0,satSum=0,cnt=0;
           for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2],bri=Math.max(r,g,b),sat=bri-Math.min(r,g,b);
+            lumSum+=0.299*r+0.587*g+0.114*b; satSum+=sat; cnt++;        // whole cover → overall mood
             if(bri<30||bri>252) continue; const k=(r>>5)+'_'+(g>>5)+'_'+(b>>5); const o=bk[k]||(bk[k]={r:0,g:0,b:0,n:0,s:0});
             o.r+=r;o.g+=g;o.b+=b;o.n++;o.s+=sat+bri*.25; }
           let arr=Object.values(bk).map(o=>({r:o.r/o.n|0,g:o.g/o.n|0,b:o.b/o.n|0,s:o.s})); arr.sort((a,b)=>b.s-a.s);
           const picked=[]; for(const c of arr){ if(picked.length>=4) break;
             if(picked.every(p=>Math.abs(p.r-c.r)+Math.abs(p.g-c.g)+Math.abs(p.b-c.b)>64)) picked.push(c); }
-          res(picked.length?picked.map(c=>`rgb(${c.r},${c.g},${c.b})`):null);
+          const cols=picked.length?picked.map(c=>`rgb(${c.r},${c.g},${c.b})`):null;
+          res({cols, lum:cnt?(lumSum/cnt)/255:.5, sat:cnt?(satSum/cnt)/255:.3, hue:cols?_hsl(_rgb(cols[0]))[0]:0});
         }catch(e){ res(null); } };
         img.onerror=()=>res(null); img.src=url; });
     }
@@ -211,6 +214,22 @@
       const pick=pool[Math.floor(Math.random()*pool.length)];
       try{ localStorage.setItem(key, pick); }catch(e){}
       return pick;
+    }
+    // Background mood from the album art (Spotify's valence/genre data is blocked
+    // for new apps, so the cover is our signal): dark covers → gloomy/heavy themes,
+    // bright warm → sunny, cool → icy/electric, pale → gentle. Still varies within
+    // the mood (never repeats the last one) so the same song isn't identical twice.
+    const MOOD={ dark:['night','embers','neon'], warm:['sunset','embers','aurora'],
+                 cool:['waves','aurora','neon'], soft:['clouds','aurora','sunset'] };
+    function themeForMood(info){
+      if(!info) return pickNext(THEME_ORDER,'lastTheme');     // no / tainted art → random
+      const {lum,sat,hue}=info; let bucket;
+      if(lum<0.34) bucket='dark';                 // dark cover → gloomy / heavy
+      else if(sat<0.20) bucket='soft';            // pale, washed-out → gentle
+      else if(hue>=20 && hue<75) bucket='warm';   // orange / yellow → sunny
+      else if(hue>=150 && hue<290) bucket='cool'; // green / blue / purple → cool
+      else bucket='warm';                         // red / pink → warm
+      return pickNext(MOOD[bucket],'lastTheme');
     }
     const mkWord=w=>{ const s=document.createElement('span'); s.className='w'; s.textContent=w; return s; };
     function clearWords(){
@@ -275,7 +294,7 @@
           el('cardTitle').textContent=np.track||'—'; el('cardArtist').textContent=np.artists||'';
           el('barTitle').textContent=np.track||''; el('barArtist').textContent=np.artists||'';
           scatterSeed=Math.floor(Math.random()*1e5);   // fresh scatter layout this play
-          extractPalette(np.art).then(c=>{ applyPalette(c); applyTheme(pickNext(THEME_ORDER,'lastTheme')); });
+          extractPalette(np.art).then(info=>{ applyPalette(info&&info.cols); applyTheme(themeForMood(info)); });
           applyStyle(pickNext(STYLE_ORDER,'lastStyle'));
           loadLyrics(np);
         }
