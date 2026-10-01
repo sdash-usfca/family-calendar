@@ -201,6 +201,17 @@
     const STYLE_ORDER=['scatter','rise','slide','cascade'];
     let curStyle='scatter';
     function applyStyle(s){ curStyle=STYLE_ORDER.includes(s)?s:'scatter'; }
+    // Fresh random look each time a song starts: pick != the last one we used
+    // (remembered across opens via localStorage), so reopening — or the next
+    // song — never repeats the previous animation. Held steady for the song.
+    let scatterSeed=0;
+    function pickNext(arr, key){
+      let last=null; try{ last=localStorage.getItem(key); }catch(e){}
+      const pool=arr.length>1 ? arr.filter(x=>x!==last) : arr;
+      const pick=pool[Math.floor(Math.random()*pool.length)];
+      try{ localStorage.setItem(key, pick); }catch(e){}
+      return pick;
+    }
     const mkWord=w=>{ const s=document.createElement('span'); s.className='w'; s.textContent=w; return s; };
     function clearWords(){
       [...wordsEl.children].forEach(c=>{ c.style.animation='none'; c.style.transition='opacity .34s ease'; c.style.opacity='0'; setTimeout(()=>c.remove(),350); });
@@ -215,7 +226,7 @@
         wordsEl.className='scatter';
         const spanN=Math.min(1, words.length/6);        // tighter scatter for short lines
         words.forEach((w,i)=>{ const s=mkWord(w);
-          const rx=seeded(idx*97+i*31), ry=seeded(idx*53+i*17+7), rz=seeded(idx*13+i*41+3);
+          const rx=seeded(scatterSeed+idx*97+i*31), ry=seeded(scatterSeed+idx*53+i*17+7), rz=seeded(scatterSeed+idx*13+i*41+3);
           s.style.left=(50+(rx-.5)*58*spanN)+'%'; s.style.top=(50+(ry-.5)*54)+'%';
           s.style.fontSize=(4.4+rz*4.6)+'vh'; s.style.setProperty('--rot',((rz-.5)*14).toFixed(1)+'deg');
           s.style.animationDelay=(i*95)+'ms'; wordsEl.appendChild(s); requestAnimationFrame(()=>s.classList.add('in')); });
@@ -263,8 +274,9 @@
           S.trackId=np.id; setArt(np.art||null);
           el('cardTitle').textContent=np.track||'—'; el('cardArtist').textContent=np.artists||'';
           el('barTitle').textContent=np.track||''; el('barArtist').textContent=np.artists||'';
-          extractPalette(np.art).then(c=>{ applyPalette(c); applyTheme(THEME_ORDER[hashStr(np.id)%THEME_ORDER.length]); });
-          applyStyle(STYLE_ORDER[hashStr((np.id||'')+'s')%STYLE_ORDER.length]);
+          scatterSeed=Math.floor(Math.random()*1e5);   // fresh scatter layout this play
+          extractPalette(np.art).then(c=>{ applyPalette(c); applyTheme(pickNext(THEME_ORDER,'lastTheme')); });
+          applyStyle(pickNext(STYLE_ORDER,'lastStyle'));
           loadLyrics(np);
         }
         decideMode();
