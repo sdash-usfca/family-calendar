@@ -32,13 +32,13 @@
     /* ---- 25% rail: YouTube (top) + Spotify (bottom) ---- */
     .rail{flex:1 1 0; min-width:0; display:flex; flex-direction:column; background:#0e0e12; border-left:1px solid rgba(255,255,255,.08);}
     .cell{flex:1 1 0; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:6% 8%; text-align:center;}
-    .cell.yt{border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 90% at 50% 30%, rgba(255,0,0,.10), transparent 70%);}
+    .cell.yt{flex:0.9 1 0; border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 90% at 50% 30%, rgba(255,0,0,.10), transparent 70%);}
     .cell.sp{background:radial-gradient(120% 90% at 50% 70%, rgba(30,215,96,.10), transparent 70%);}
-    .cell.news{flex:1.4 1 0; justify-content:flex-start; padding-top:30px; border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 80% at 50% 18%, rgba(90,130,255,.10), transparent 70%);}
+    .cell.news{flex:1.3 1 0; justify-content:flex-start; padding-top:30px; border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 80% at 50% 18%, rgba(90,130,255,.10), transparent 70%);}
     /* Family Notes + This Week cells (moved off the Hub) */
     .cell.notes, .cell.meals{ justify-content:flex-start; align-items:stretch; gap:10px; padding:20px 16px; border-bottom:1px solid rgba(255,255,255,.08);}
-    .cell.notes{ background:radial-gradient(120% 90% at 50% 40%, rgba(236,150,90,.12), transparent 72%);}
-    .cell.meals{ background:radial-gradient(120% 90% at 50% 55%, rgba(120,200,140,.12), transparent 72%); border-bottom:none;}
+    .cell.notes{ flex:1.1 1 0; background:radial-gradient(120% 90% at 50% 40%, rgba(236,150,90,.12), transparent 72%);}
+    .cell.meals{ flex:1.3 1 0; background:radial-gradient(120% 90% at 50% 55%, rgba(120,200,140,.12), transparent 72%); border-bottom:none;}
     .railhead{ font-size:min(2.2vh,13px); letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.5); font-weight:700; text-align:center; flex:none;}
     .notelist{ display:flex; flex-direction:column; gap:9px; overflow:hidden; width:100%;}
     .notelist .n{ font-size:min(2.6vh,17px); line-height:1.3; color:rgba(255,255,255,.9); border-left:3px solid rgba(236,150,90,.7); padding-left:10px;
@@ -105,19 +105,6 @@
           <div class="sub">Scan to send a video</div>
         </div>
         <iframe id="ytframe" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-      </div>
-      <div class="cell sp">
-        <div id="spidle">
-          <div class="logo">♫</div>
-          <div class="name">Spotify</div>
-          <div class="sub">Nothing playing</div>
-        </div>
-        <div id="spnow">
-          <div class="art" id="spart"></div>
-          <div class="track" id="sptrack"></div>
-          <div class="artist" id="spartist"></div>
-          <div class="cta">▶ Music tab for lyrics</div>
-        </div>
       </div>
       <div class="cell notes">
         <div class="railhead">💌 Family Notes</div>
@@ -186,20 +173,6 @@
       }catch(e){}
     }
 
-    // ---- Spotify corner (live now-playing) ----
-    const spidle=document.getElementById('spidle'), spnow=document.getElementById('spnow');
-    async function loadSpotify(){
-      try{
-        const d = await fetch('/api/nowplaying',{cache:'no-store'}).then(r=>r.json());
-        if(d.is_playing && d.track){
-          document.getElementById('spart').style.backgroundImage = d.art?`url("${d.art}")`:'';
-          document.getElementById('sptrack').textContent = d.track;
-          document.getElementById('spartist').textContent = d.artists||'';
-          spnow.style.display='flex'; spidle.style.display='none';
-        } else { spnow.style.display='none'; spidle.style.display='flex'; }
-      }catch(e){}
-    }
-
     function tickClock(){ const d=new Date(); let h=d.getHours()%12||12;
       document.getElementById('clk').textContent = h+':'+String(d.getMinutes()).padStart(2,'0'); }
 
@@ -237,7 +210,6 @@
 
     loadPhotos(); setInterval(loadPhotos, 30000); setInterval(advance, 8000);
     loadYouTube(); setInterval(loadYouTube, 3000);
-    loadSpotify(); setInterval(loadSpotify, 6000);
     loadNews().then(()=>setTimeout(showNews, 300)); setInterval(loadNews, 600000); setInterval(showNews, 30000);
     loadNotesCell(); setInterval(loadNotesCell, 30000);
     loadMealsCell(); setInterval(loadMealsCell, 300000);

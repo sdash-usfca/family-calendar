@@ -6,6 +6,7 @@
 #   1. Network down          -> bounce WiFi (the drop that once needed a reboot)
 #   2. App server not healthy -> restart calboard
 #   3. Display frozen         -> reload Chromium (labwc's lwrespawn brings it back)
+#   4. BT speaker dropped     -> reconnect the Nest so wall audio has an output
 #
 # It only speaks up when it acts, so `journalctl -u wall-watchdog` stays quiet
 # until something needed fixing.
@@ -47,6 +48,13 @@ if [ "$HEALTHY" = 1 ]; then
       fi
     fi
   fi
+fi
+
+# 4) Keep the Bluetooth speaker (Nest "Kitchen speaker") connected so the wall's
+#    audio has somewhere to go — reconnect if it dropped (idle power-save / reboot).
+NEST="48:D6:D5:DD:38:4C"
+if ! bluetoothctl info "$NEST" 2>/dev/null | grep -q "Connected: yes"; then
+  bluetoothctl connect "$NEST" >/dev/null 2>&1 && say "reconnected Bluetooth speaker"
 fi
 
 exit 0
