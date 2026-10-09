@@ -11,7 +11,7 @@
     .wrap{display:flex; height:100vh; width:100vw;}
 
     /* ---- 75% photo slideshow ---- */
-    .photo{position:relative; flex:3 1 0; min-width:0; background:#000; overflow:hidden;}
+    .photo{position:relative; flex:4 1 0; min-width:0; background:#000; overflow:hidden;}
     .photo .ph{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
       opacity:0; transition:opacity 1.3s ease; will-change:opacity,transform;}
     .photo .ph.show{opacity:1; animation:kb 18s ease-in-out forwards;}
@@ -34,7 +34,21 @@
     .cell{flex:1 1 0; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:6% 8%; text-align:center;}
     .cell.yt{border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 90% at 50% 30%, rgba(255,0,0,.10), transparent 70%);}
     .cell.sp{background:radial-gradient(120% 90% at 50% 70%, rgba(30,215,96,.10), transparent 70%);}
-    .cell.news{flex:2 1 0; justify-content:flex-start; padding-top:36px; border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 80% at 50% 18%, rgba(90,130,255,.10), transparent 70%);}
+    .cell.news{flex:1.4 1 0; justify-content:flex-start; padding-top:30px; border-bottom:1px solid rgba(255,255,255,.08); background:radial-gradient(120% 80% at 50% 18%, rgba(90,130,255,.10), transparent 70%);}
+    /* Family Notes + This Week cells (moved off the Hub) */
+    .cell.notes, .cell.meals{ justify-content:flex-start; align-items:stretch; gap:10px; padding:20px 16px; border-bottom:1px solid rgba(255,255,255,.08);}
+    .cell.notes{ background:radial-gradient(120% 90% at 50% 40%, rgba(236,150,90,.12), transparent 72%);}
+    .cell.meals{ background:radial-gradient(120% 90% at 50% 55%, rgba(120,200,140,.12), transparent 72%); border-bottom:none;}
+    .railhead{ font-size:min(2.2vh,13px); letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.5); font-weight:700; text-align:center; flex:none;}
+    .notelist{ display:flex; flex-direction:column; gap:9px; overflow:hidden; width:100%;}
+    .notelist .n{ font-size:min(2.6vh,17px); line-height:1.3; color:rgba(255,255,255,.9); border-left:3px solid rgba(236,150,90,.7); padding-left:10px;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+    .meallist{ display:flex; flex-direction:column; width:100%; overflow:hidden;}
+    .mealrow{ display:flex; align-items:baseline; gap:10px; padding:5px 2px; border-bottom:1px solid rgba(255,255,255,.07);}
+    .mealrow .d{ flex:none; width:36px; font-size:min(1.9vh,12px); font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:rgba(255,255,255,.4);}
+    .mealrow .m{ flex:1; min-width:0; font-size:min(2.4vh,16px); color:rgba(255,255,255,.85); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .mealrow.today .d{ color:#8fd6ab;} .mealrow.today .m{ color:#eaffe9; font-weight:700;}
+    .railempty{ color:rgba(255,255,255,.4); font-size:min(2.2vh,14px); text-align:center; padding-top:8px;}
     .newshead{font-size:min(2.4vh,14px); letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.45); font-weight:700; margin-bottom:1.6vh}
     .newsbody{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; width:100%; transition:opacity .45s ease}
     .newsbody .nt{font-weight:800; font-size:min(4vh,27px); line-height:1.28; text-wrap:balance; max-width:100%}
@@ -105,13 +119,23 @@
           <div class="cta">▶ Music tab for lyrics</div>
         </div>
       </div>
+      <div class="cell notes">
+        <div class="railhead">💌 Family Notes</div>
+        <div class="notelist" id="notelist"><div class="railempty">…</div></div>
+      </div>
+      <div class="cell meals">
+        <div class="railhead">🍽️ This Week</div>
+        <div class="meallist" id="meallist"><div class="railempty">…</div></div>
+      </div>
     </div>
   </div>
 
   <script>
     const imgA=document.getElementById('imgA'), imgB=document.getElementById('imgB'),
           empty=document.getElementById('empty'), addchip=document.getElementById('addchip');
-    let photos=[], idx=0, useA=true, addUrl='';
+    let photos=[], idx=0, useA=true, addUrl='', photosKey='';
+    const esc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
     function qrFor(url){ return 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url); }
     function showEmpty(on){
@@ -135,10 +159,15 @@
       try{
         const d = await fetch('/api/photos',{cache:'no-store'}).then(r=>r.json());
         addUrl = d.add_url || '';
-        const changed = (d.photos||[]).join('|') !== photos.join('|');
-        photos = d.photos || [];
-        if(!photos.length){ showEmpty(true); imgA.classList.remove('show'); imgB.classList.remove('show'); }
-        else { showEmpty(false); if(changed){ idx=Math.min(idx, photos.length-1); swapTo(idx); } }
+        const list = d.photos || [];
+        // Re-shuffle only when the SET of photos actually changes (incl. first load),
+        // not on every poll — so the order stays put but each gallery visit is random.
+        const key = list.slice().sort().join('|');
+        if(key !== photosKey){
+          photosKey = key; photos = shuffle(list.slice()); idx = 0;
+          if(!photos.length){ showEmpty(true); imgA.classList.remove('show'); imgB.classList.remove('show'); }
+          else { showEmpty(false); swapTo(0); }
+        }
       }catch(e){}
     }
 
@@ -174,6 +203,25 @@
     function tickClock(){ const d=new Date(); let h=d.getHours()%12||12;
       document.getElementById('clk').textContent = h+':'+String(d.getMinutes()).padStart(2,'0'); }
 
+    // ---- Family Notes (moved off the Hub) ----
+    async function loadNotesCell(){ try{
+      const d=await fetch('/api/notes',{cache:'no-store'}).then(r=>r.json());
+      const items=(d.items||[]).slice(-6).reverse();
+      document.getElementById('notelist').innerHTML = items.length
+        ? items.map(it=>`<div class="n">${esc(it.name||it.text||'')}</div>`).join('')
+        : '<div class="railempty">No notes yet — post one from your phone 💌</div>';
+    }catch(e){} }
+
+    // ---- This Week's dinners (moved off the Hub) ----
+    const MLBL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+    async function loadMealsCell(){ try{
+      const d=await fetch('/api/meals',{cache:'no-store'}).then(r=>r.json());
+      const m=d.meals||{}, today=d.today, days=d.days||['mon','tue','wed','thu','fri','sat','sun'];
+      document.getElementById('meallist').innerHTML = days.map(k=>
+        `<div class="mealrow ${k===today?'today':''}"><span class="d">${MLBL[k]||k}</span>`+
+        `<span class="m">${m[k]?esc(m[k]):'—'}</span></div>`).join('');
+    }catch(e){} }
+
     // ---- News headlines (rotating) ----
     let news=[], ni=0; const newsbody=document.getElementById('newsbody');
     async function loadNews(){ try{ const d=await fetch('/api/news',{cache:'no-store'}).then(r=>r.json()); if(d.items&&d.items.length) news=d.items; }catch(e){} }
@@ -191,6 +239,8 @@
     loadYouTube(); setInterval(loadYouTube, 3000);
     loadSpotify(); setInterval(loadSpotify, 6000);
     loadNews().then(()=>setTimeout(showNews, 300)); setInterval(loadNews, 600000); setInterval(showNews, 30000);
+    loadNotesCell(); setInterval(loadNotesCell, 30000);
+    loadMealsCell(); setInterval(loadMealsCell, 300000);
     tickClock(); setInterval(tickClock, 15000);
 
     const MODE_URL={hub:'/',music:'/music',gallery:'/gallery',youtube:'/youtube'};

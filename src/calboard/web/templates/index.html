@@ -51,7 +51,7 @@
     .clock { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .clock .ampm { font-size: 20px; color: var(--muted); margin-left: 2px; }
 
-    main { display: grid; grid-template-columns: 1fr 380px; gap: 20px; padding: 6px 32px 24px;
+    main { display: grid; grid-template-columns: 1fr 20%; gap: 20px; padding: 6px 32px 24px;
       flex: 1 1 auto; min-height: 0; }
 
     /* Day-column week board */
@@ -85,7 +85,7 @@
     .note-item { display: flex; gap: 8px; padding: 9px 2px; border-bottom: 1px solid var(--line);
       font-size: 15px; line-height: 1.35; }
     .note-item .nmark { flex: none; }
-    .panel h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+    .panel h2 { margin: 0 0 12px; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
     .panel h2 .ic { display: inline-flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border-radius: 10px; background: #f3ece0; font-size: 17px; flex: none; }
     .ic.groc { background: #e3f3ea; } .ic.check { background: #e9e4f7; }
@@ -108,12 +108,14 @@
     .grocery { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .grocery .scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
     .grocery .scroll::-webkit-scrollbar { width: 0; }
-    .gitem { display: flex; align-items: center; gap: 11px; padding: 9px 2px;
+    #checklist { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+    #checklist::-webkit-scrollbar { width: 0; }
+    .gitem { display: flex; align-items: center; gap: 12px; padding: 11px 2px;
       border-bottom: 1px solid var(--line); cursor: pointer; }
-    .gitem .box { width: 21px; height: 21px; border-radius: 6px; border: 2px solid var(--line);
-      flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+    .gitem .box { width: 25px; height: 25px; border-radius: 7px; border: 2px solid var(--line);
+      flex: none; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; }
     .gitem.done .box { background: var(--accent); border-color: var(--accent); }
-    .gitem .gtext { font-size: 15px; font-weight: 600; }
+    .gitem .gtext { font-size: 19px; font-weight: 600; line-height: 1.25; }
     .gitem.done .gtext { text-decoration: line-through; color: var(--muted); font-weight: 500; }
     .panel h2 .hdr-qr { margin-left: auto; flex: none; line-height: 0; }
     .panel h2 .hdr-qr img { width: 48px; height: 48px; border-radius: 8px; background: #fff; padding: 2px; display: block; }
@@ -189,32 +191,11 @@
         <div class="scroll" id="grocery"><div class="empty-hint">Loading…</div></div>
       </section>
 
-      <section class="panel" id="notes-panel">
-        <h2><span class="ic notes">💌</span>Family Notes</h2>
-        <div id="notes"><div class="empty-hint">Loading…</div></div>
-      </section>
-
       <section class="panel" id="checklist-panel">
         <h2><span class="ic check">📋</span>Today's Checklist</h2>
         <div id="checklist"><div class="empty-hint">Loading…</div></div>
       </section>
 
-      <section class="panel" id="meal-panel">
-        <h2><span class="ic meal">🍽️</span>This Week<span class="hdr-qr" id="meal-qr" title="Scan to plan the week"></span></h2>
-        <div id="meal"><div class="empty-hint">Loading…</div></div>
-      </section>
-
-      <section class="panel word" id="word-panel" style="display:none">
-        <h2><span class="ic word">📖</span>Word of the Day</h2>
-        <div class="whead">
-          <span class="w" id="wd-word"></span>
-          <span class="phon" id="wd-phon"></span>
-          <span class="pos" id="wd-pos"></span>
-        </div>
-        <div class="def" id="wd-def"></div>
-        <div class="ex-label" id="wd-ex-label" style="display:none">Use it in a sentence</div>
-        <div class="ex" id="wd-ex" style="display:none"></div>
-      </section>
     </div>
   </main>
 
@@ -418,23 +399,7 @@
         document.getElementById('w-range').textContent = `H ${data.weather.hi}° · L ${data.weather.lo}°`;
       }
 
-      // (The static chores panel was replaced by the dynamic Today's Checklist — see refreshChecklist.)
-
-      // The "This Week" meals panel is rendered by refreshMeals().
-
-      if (data.word_of_day) {
-        const w = data.word_of_day;
-        document.getElementById('word-panel').style.display = '';
-        document.getElementById('wd-word').textContent = w.word;
-        document.getElementById('wd-phon').textContent = w.phonetic || '';
-        document.getElementById('wd-pos').textContent = w.part_of_speech;
-        document.getElementById('wd-def').textContent = w.definition;
-        if (w.example) {
-          document.getElementById('wd-ex-label').style.display = '';
-          document.getElementById('wd-ex').style.display = '';
-          document.getElementById('wd-ex').textContent = '"' + w.example + '"';
-        }
-      }
+      // (Lists live in the side rail; Family Notes + This Week moved to the gallery rail.)
     }
 
     async function refreshMeals(){
@@ -465,8 +430,6 @@
     refreshBoard(); setInterval(refreshBoard, 900000);   // weather/word change slowly
     refreshGrocery(); setInterval(refreshGrocery, 15000);
     refreshChecklist(); setInterval(refreshChecklist, 15000);
-    refreshNotes(); setInterval(refreshNotes, 15000);
-    refreshMeals(); setInterval(refreshMeals, 600000);
     refreshCountdowns(); setInterval(refreshCountdowns, 300000);   // recompute days ~5-minutely
 
     // Follow the wall "mode" set from the phone remote.
