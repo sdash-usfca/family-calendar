@@ -110,10 +110,6 @@
         <div class="railhead">💌 Family Notes</div>
         <div class="notelist" id="notelist"><div class="railempty">…</div></div>
       </div>
-      <div class="cell meals">
-        <div class="railhead">🍽️ This Week</div>
-        <div class="meallist" id="meallist"><div class="railempty">…</div></div>
-      </div>
     </div>
   </div>
 
@@ -185,15 +181,6 @@
         : '<div class="railempty">No notes yet — post one from your phone 💌</div>';
     }catch(e){} }
 
-    // ---- This Week's dinners (moved off the Hub) ----
-    const MLBL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
-    async function loadMealsCell(){ try{
-      const d=await fetch('/api/meals',{cache:'no-store'}).then(r=>r.json());
-      const m=d.meals||{}, today=d.today, days=d.days||['mon','tue','wed','thu','fri','sat','sun'];
-      document.getElementById('meallist').innerHTML = days.map(k=>
-        `<div class="mealrow ${k===today?'today':''}"><span class="d">${MLBL[k]||k}</span>`+
-        `<span class="m">${m[k]?esc(m[k]):'—'}</span></div>`).join('');
-    }catch(e){} }
 
     // ---- News headlines (rotating) ----
     let news=[], ni=0; const newsbody=document.getElementById('newsbody');
@@ -212,7 +199,6 @@
     loadYouTube(); setInterval(loadYouTube, 3000);
     loadNews().then(()=>setTimeout(showNews, 300)); setInterval(loadNews, 600000); setInterval(showNews, 30000);
     loadNotesCell(); setInterval(loadNotesCell, 30000);
-    loadMealsCell(); setInterval(loadMealsCell, 300000);
     tickClock(); setInterval(tickClock, 15000);
 
     const MODE_URL={hub:'/',music:'/music',gallery:'/gallery',youtube:'/youtube'};
