@@ -21,14 +21,9 @@ easy to read, tweak, and restyle.
 
 ## 📸 Screenshots
 
-> _Add your photos to the [`screenshots/`](screenshots/) folder (see the shot list
-> there). A photo of it actually running on the wall makes the best hero image._
-
-| On the wall — Hub | Music (synced lyrics) |
-|:--:|:--:|
-| ![The Hub](screenshots/hub.jpg) | ![Lyric screen](screenshots/music.jpg) |
-| **Photo gallery + rail** | **Phone remote** |
-| ![Gallery](screenshots/gallery.jpg) | ![Remote](screenshots/remote.jpg) |
+_Coming soon. The [`screenshots/`](screenshots/) folder has the shot list — a photo
+of it running on the wall makes the best hero image. Drop images there (or drag them
+into this file on GitHub) and they'll show up here._
 
 ---
 
@@ -38,15 +33,15 @@ easy to read, tweak, and restyle.
 - 📅 **Aggregated calendar** — Google + iCloud + any `.ics` feed, color-coded per calendar, recurring events expanded. No OAuth, just private iCal URLs.
 - ⏰ **"What's Next"** — upcoming events as big cards with live countdowns, plus a bin/recycling reminder.
 - 🎉 **Countdowns** — birthdays, trips, holidays (with yearly repeat) as chips on the Hub.
-- 🍽️ **Weekly meal plan** — the week's dinners at a glance.
-- 🛒 **Shared lists** — Grocery, Checklist, and Family Notes, always in sync.
+- 🛒 **Shared lists** — Grocery + Checklist on the Hub, Family Notes in the gallery rail, all synced to the Bring! app.
 - 🌤️ Weather, big clock, a warm time-of-day greeting, and a word of the day.
 
 ### Entertainment modes
-- 🎵 **Synced-lyric music screen** — live Spotify track with time-synced lyrics (LRCLIB), animated word-by-word over a library of rotating themes and animation styles.
-- 🖼️ **Photo gallery** — Ken-Burns slideshow of your uploaded photos, with a side rail of news + now-playing.
+- 🎵 **Synced-lyric music screen** — live Spotify track with time-synced lyrics (LRCLIB), animated word-by-word. The **background matches the mood of the music** (read from the album art — dark/heavy covers get moody themes, bright ones get sunny themes) and varies every play.
+- 🖼️ **Photo gallery** — a shuffled Ken-Burns slideshow of your uploaded photos (every photo gets equal time), with a side rail of **news, YouTube, and family notes**.
 - ▶️ **Full-screen YouTube** — send a video by link *or* by name from your phone.
 - 📰 **News** — rotating headlines with short TL;DR summaries (NPR + BBC).
+- 🔊 **Audio anywhere** — wall sound plays through the monitor, or pair a Bluetooth speaker (e.g. a Google Home / Nest) to hear music across the room.
 - 🔄 **Auto mode** — when nothing's playing, gently rotates between the calendar and the gallery.
 
 ### From your phone (any browser on the home network)
